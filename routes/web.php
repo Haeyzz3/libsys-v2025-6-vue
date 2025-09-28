@@ -38,7 +38,7 @@ Route::middleware($middleware)->group(function () {
         Route::get('/', [UserController::class, 'index'])->name('users.index');
         Route::get('/all', [UserController::class, 'all'])->name('users.all');
         Route::get('/{id}/edit', [UserController::class, 'edit'])->name('users.edit');
-        Route::group(['middleware' => ['can:viewAny, App\Models\User']], function () {
+        Route::group(['middleware' => ['can:viewAny, App\\Models\\User']], function () {
             //            Route::get('/import', [UserController::class, 'import'])->name('users.import');
             //            Route::post('/import', [UserController::class, 'importStore'])->name('users.import.store');
             Route::get('/admins',[AdminController::class, 'index'])->name('admins.index');
@@ -79,7 +79,7 @@ Route::middleware($middleware)->group(function () {
         Route::delete('/graduate/{id}', [GraduateStudentController::class, 'destroy'])->name('graduate.destroy');
     });
     Route::prefix('records')->group(function () {
-        Route::group(['middleware' => ['can:viewAny, App\Models\User']], function () {
+        Route::group(['middleware' => ['can:viewAny, App\\Models\\User']], function () {
         //            Route::get('/import', [BookController::class, 'import'])->name('books.import');
         //            Route::post('/import', [BookController::class, 'importStore'])->name('books.import.store');
         });
@@ -125,6 +125,7 @@ Route::middleware($middleware)->group(function () {
 
         Route::prefix('logger')->group(function () {
         Route::get('/', [LibraryVisitController::class, 'index'])->name('logger.index');
+        Route::get('/api/visit-card-stats', [LibraryVisitController::class, 'visitCardStats'])->name('logger.api.visitCardStats');
     });
 
     Route::get('/test', [TestController::class, 'index'])->name('test.index');

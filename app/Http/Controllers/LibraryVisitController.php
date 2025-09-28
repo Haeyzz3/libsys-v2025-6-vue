@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Course;
 use App\Models\LibraryVisit;
 use App\Models\User;
 use App\Models\VisitPurpose;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -95,19 +97,23 @@ class LibraryVisitController extends Controller
         $success_message = '';
 
         $user = User::where('id', $request->patron_id)->first();
+        if (!$user) {
+            session()->flash('error', 'User not found');
+            return to_route('logger.create');
+        }
 
         try {
-
             if (!$request->purpose_id) {
                 $user_entry = LibraryVisit::where('user_id', $request->patron_id)->whereNull('exit_time')->first();
-
-                $user_entry->update([
-                    'exit_time' => now(),
-                ]);
-                $success_message = 'Thank you for visiting USeP Library!';
-
+                if ($user_entry) {
+                    $user_entry->update([
+                        'exit_time' => now(),
+                    ]);
+                    $success_message = 'Thank you for visiting USeP Library!';
+                } else {
+                    $success_message = 'No active session found.';
+                }
             } else {
-
                 $purpose = VisitPurpose::where('id', $request->purpose_id)->first();
                 if ($purpose) {
                     LibraryVisit::create([
@@ -116,50 +122,54 @@ class LibraryVisitController extends Controller
                         'visit_purpose_id' => $purpose->id,
                     ]);
                     $success_message = 'Welcome to USeP Library!';
+                } else {
+                    $success_message = 'Invalid purpose selected';
                 }
             }
-
             session()->flash('success', $success_message);
-
         } catch (\Exception $e) {
             session()->flash('error', 'Something went wrong');
-            // Log the error
             \Log::error('Error: ' . $e->getMessage(), [
                 'user_id' => $request->patron_id,
                 'purpose_id' => $request->purpose_id,
                 'exception' => $e
             ]);
         }
-
         return to_route('logger.create');
-
     }
 
     public function storeTransaction(Request $request): ?JsonResponse
     {
-        try
-        {
+        try {
             if ($request->transaction_type === 'logout') {
                 $user_entry = LibraryVisit::where('user_id', $request->user_id)->whereNull('exit_time')->first();
-
+                if (!$user_entry) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No active visit to logout.'
+                    ], 404);
+                }
                 $user_entry->update([
                     'exit_time' => now(),
                 ]);
             } elseif ($request->transaction_type === 'login') {
+                $user = User::find($request->user_id);
+                if (!$user) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'User not found.'
+                    ], 404);
+                }
                 LibraryVisit::create([
                     'user_id' => $request->user_id,
                     'entry_time' => now(),
                 ]);
             }
-
-            return response()->json([
-                'success' => true,
-            ]);
-
+            return response()->json(['success' => true]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Search failed',
+                'message' => 'Transaction failed',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -394,4 +404,99 @@ class LibraryVisitController extends Controller
         }
     }
 
+    public function visitCardStats(Request $request)
+    {
+        $filter = $request->get('filter', 'day'); // day|week|month|custom
+        $from = $request->get('custom_from');
+        $to = $request->get('custom_to');
+
+        // Determine period
+        $now = Carbon::now();
+        switch ($filter) {
+            case 'week':
+                $start = $now->copy()->startOfWeek();
+                $end = $now->copy()->endOfWeek();
+                break;
+            case 'month':
+                $start = $now->copy()->startOfMonth();
+                $end = $now->copy()->endOfMonth();
+                break;
+            case 'custom':
+                if ($from && $to) {
+                    $start = Carbon::parse($from)->startOfDay();
+                    $end = Carbon::parse($to)->endOfDay();
+                } else {
+                    // Fallback to day if custom invalid
+                    $filter = 'day';
+                    $start = $now->copy()->startOfDay();
+                    $end = $now->copy()->endOfDay();
+                }
+                break;
+            case 'day':
+            default:
+                $start = $now->copy()->startOfDay();
+                $end = $now->copy()->endOfDay();
+        }
+
+        // Build base join for students (user_type_id 3=undergrad, 4=grad)
+        $baseJoins = function($query) {
+            $query->join('users', 'library_visits.user_id', '=', 'users.id')
+                ->leftJoin('undergraduate_students', 'undergraduate_students.user_id', '=', 'users.id')
+                ->leftJoin('graduate_students', 'graduate_students.user_id', '=', 'users.id')
+                ->leftJoin('courses', function($join) {
+                    $join->on('courses.id', '=', 'undergraduate_students.course_id')
+                        ->orOn('courses.id', '=', 'graduate_students.course_id');
+                })
+                ->whereIn('users.user_type_id', [3,4]);
+        };
+
+        // Currently in library (open visits)
+        $currentQuery = LibraryVisit::query();
+        $baseJoins($currentQuery);
+        $currentQuery->whereNull('library_visits.exit_time');
+        $currentInLibraryRaw = $currentQuery->selectRaw('COALESCE(courses.code, "UNASSIGNED") as program_code, COUNT(DISTINCT library_visits.user_id) as cnt')
+            ->groupBy('program_code')
+            ->get();
+        $currentlyInLibrary = [];
+        $totalCurrent = 0;
+        foreach ($currentInLibraryRaw as $row) {
+            $currentlyInLibrary[$row->program_code] = (int) $row->cnt;
+            $totalCurrent += (int) $row->cnt;
+        }
+        $currentlyInLibrary['all'] = $totalCurrent;
+
+        // Visits within period (count each visit/entry)
+        $visitQuery = LibraryVisit::query();
+        $baseJoins($visitQuery);
+        $visitQuery->whereBetween('library_visits.entry_time', [$start, $end]);
+        $visitsRaw = $visitQuery->selectRaw('COALESCE(courses.code, "UNASSIGNED") as program_code, COUNT(*) as cnt')
+            ->groupBy('program_code')
+            ->get();
+        $visits = [];
+        $totalVisits = 0;
+        foreach ($visitsRaw as $row) {
+            $visits[$row->program_code] = (int) $row->cnt;
+            $totalVisits += (int) $row->cnt;
+        }
+        $visits['all'] = $totalVisits;
+
+        // Program list (only include programs that exist in courses table for now)
+        $programs = Course::select('code','name')->orderBy('code')->get()->map(function($c){
+            return ['code' => $c->code, 'name' => $c->name];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'programs' => $programs,
+                'currently_in_library' => $currentlyInLibrary,
+                'visits' => $visits,
+                'period' => [
+                    'filter' => $filter,
+                    'start' => $start->toDateTimeString(),
+                    'end' => $end->toDateTimeString(),
+                ],
+            ],
+        ]);
+    }
 }

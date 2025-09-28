@@ -19,9 +19,11 @@ import {
     VisibilityState,
 } from '@tanstack/vue-table';
 import { ArrowUpDown, ChevronDown, ListFilter, Plus, X } from 'lucide-vue-next';
-import { h, ref } from 'vue';
+import { h, ref, computed, watch } from 'vue';
 import { route } from 'ziggy-js';
 import DropdownAction from './DataTableDemoColumn.vue';
+import axios from 'axios';
+import type { Column, ColumnDef, Row, SortingState, Table } from '@tanstack/vue-table';
 
 interface Props {
     data?: {
@@ -46,7 +48,6 @@ const props = withDefaults(defineProps<Props>(), {
     availablePurposes: () => [],
 });
 
-import type { Column, ColumnDef, ColumnFiltersState, Row, SortingState, Table } from '@tanstack/vue-table';
 type RowData = any;
 const data = props.data.data;
 const columns: ColumnDef<RowData>[] = [
@@ -404,8 +405,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-import { computed } from 'vue';
-
 // Dropdown + filters
 const showDownload = ref(false);
 const activeFilter = ref('day');
@@ -414,23 +413,14 @@ const activeFilter = ref('day');
 const selectedVisitProgram = ref('all');
 const selectedLibraryProgram = ref('all');
 
-// Fake data
-const libraryData = {
-    all: 128,
-    BSIT: 52,
-    BSABE: 38,
-    BSNED: 15,
-    BSED: 23,
-};
+// Dynamic program list & stats (replacing static demo data)
+const visitPrograms = ref<{ code: string; name: string }[]>([]);
+const currentlyInLibraryMap = ref<Record<string, number>>({ all: 0 });
+const visitsMap = ref<Record<string, number>>({ all: 0 });
+const statsLoading = ref(false);
+const statsError = ref<string | null>(null);
 
-const visitData = {
-    all: 45,
-    BSIT: 20,
-    BSABE: 15,
-    BSNED: 10,
-    BSED: 5,
-};
-
+// Filters for Visits Card Section
 const filters = [
     { label: 'Day', value: 'day' },
     { label: 'Week', value: 'week' },
@@ -438,26 +428,60 @@ const filters = [
     { label: 'Custom', value: 'custom' },
 ];
 
-function toggleDropdown() {
-    showDownload.value = !showDownload.value;
+async function fetchVisitCardStats() {
+    statsLoading.value = true;
+    statsError.value = null;
+    try {
+        const params: any = { filter: activeFilter.value };
+        if (activeFilter.value === 'custom') {
+            // TODO: wire date pickers; currently placeholder
+            // params.custom_from = customFrom.value; params.custom_to = customTo.value;
+        }
+        const { data } = await axios.get(route('logger.api.visitCardStats'), { params });
+        if (data.success) {
+            visitPrograms.value = data.data.programs;
+            currentlyInLibraryMap.value = data.data.currently_in_library;
+            visitsMap.value = data.data.visits;
+            // Ensure selected programs still exist
+            const codes = visitPrograms.value.map(p => p.code);
+            if (selectedVisitProgram.value !== 'all' && !codes.includes(selectedVisitProgram.value)) {
+                selectedVisitProgram.value = 'all';
+            }
+            if (selectedLibraryProgram.value !== 'all' && !codes.includes(selectedLibraryProgram.value)) {
+                selectedLibraryProgram.value = 'all';
+            }
+        } else {
+            statsError.value = 'Failed to load visit statistics';
+        }
+    } catch (e: any) {
+        statsError.value = e?.response?.data?.message || e.message || 'Error loading statistics';
+    } finally {
+        statsLoading.value = false;
+    }
 }
 
-function setFilter(filter) {
-    activeFilter.value = filter;
-}
+// Initial load
+fetchVisitCardStats();
 
-function download(type) {
-    alert(`Downloading ${type}...`);
-}
-
-// Computed for "Currently in Library"
-const currentLibraryCount = computed(() => {
-    return libraryData[selectedLibraryProgram.value] ?? libraryData.all;
+// Refresh when filter changes
+watch(activeFilter, () => {
+    fetchVisitCardStats();
 });
 
-// Computed for "Visits Today"
+// Computed for "Currently in Library" (dynamic)
+const currentLibraryCount = computed(() => {
+    if (selectedLibraryProgram.value === 'all') {
+        return currentlyInLibraryMap.value.all ?? 0;
+    }
+    return currentlyInLibraryMap.value[selectedLibraryProgram.value] ?? 0;
+});
+
+// Computed for "Visits" (dynamic)
 const visitCount = computed(() => {
-    return visitData[selectedVisitProgram.value] ?? visitData.all;
+    if (selectedVisitProgram.value === 'all') {
+        return visitsMap.value.all ?? 0;
+    }
+    return visitsMap.value[selectedVisitProgram.value] ?? 0;
 });
 
 const visitTitle = computed(() => {
@@ -511,39 +535,34 @@ const violations = ref([
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="p-4">
             <div class="w-full">
+
                 <!-- Visits Card Section -->
                 <div class="mb-6 flex flex-row flex-wrap gap-4">
                     <div class="flex flex-1 gap-4">
                         <!-- Currently in Library Card -->
-                        <div class="flex-1 rounded-2xl border-2 border-[#800000] bg-white p-3 shadow-lg">
+                        <div class="flex-1 rounded-2xl border-2 border-[#800000] bg-white p-3 shadow-lg relative">
+                            <div v-if="statsLoading" class="absolute inset-0 flex items-center justify-center bg-white/60 text-xs font-medium">Loading...</div>
                             <div class="mb-1 flex items-center justify-between">
                                 <span class="text-sm font-bold text-[#800000]">Currently in Library</span>
-
-                                <!-- Program dropdown -->
                                 <select
                                     v-model="selectedLibraryProgram"
                                     class="rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]"
                                 >
                                     <option value="all">All Programs</option>
-                                    <option value="BSIT">BSIT</option>
-                                    <option value="BSABE">BSABE</option>
-                                    <option value="BSNED">BSNED</option>
-                                    <option value="BSED">BSED</option>
+                                    <option v-for="p in visitPrograms" :key="p.code" :value="p.code">{{ p.code }}</option>
                                 </select>
                             </div>
-
-                            <!-- Centered larger number -->
                             <div class="flex items-center justify-center py-1">
-                                <span
-                                    class="flex h-14 w-14 items-center justify-center rounded-full bg-[#FFD700]/20 text-3xl font-extrabold text-[#800000]"
-                                >
+                                <span class="flex h-14 w-14 items-center justify-center rounded-full bg-[#FFD700]/20 text-3xl font-extrabold text-[#800000]">
                                     {{ currentLibraryCount }}
                                 </span>
                             </div>
+                            <p v-if="statsError" class="mt-1 text-center text-[10px] text-red-600">{{ statsError }}</p>
                         </div>
 
-                        <!-- Visits Today Card -->
-                        <div class="flex-1 rounded-2xl border-2 border-[#FFD700] bg-white p-3 shadow-lg">
+                        <!-- Visits Today / Period Card -->
+                        <div class="flex-1 rounded-2xl border-2 border-[#FFD700] bg-white p-3 shadow-lg relative">
+                            <div v-if="statsLoading" class="absolute inset-0 flex items-center justify-center bg-white/60 text-xs font-medium">Loading...</div>
                             <div class="mb-2 flex items-center justify-between">
                                 <div class="flex items-center gap-2">
                                     <span class="text-sm font-bold text-[#B8860B]">
@@ -553,8 +572,6 @@ const violations = ref([
                                         {{ visitCount }}
                                     </span>
                                 </div>
-
-                                <!-- Download dropdown -->
                                 <div class="relative">
                                     <button
                                         @click="toggleDropdown"
@@ -563,23 +580,13 @@ const violations = ref([
                                         Download
                                         <span class="ml-1">▼</span>
                                     </button>
-                                    <div
-                                        v-if="showDownload"
-                                        class="absolute right-0 mt-1 w-36 rounded border border-gray-200 bg-white text-sm shadow-lg"
-                                    >
-                                        <button @click="download('CSV')" class="block w-full px-3 py-1.5 text-left hover:bg-gray-100">
-                                            Download CSV
-                                        </button>
-                                        <button @click="download('Excel')" class="block w-full px-3 py-1.5 text-left hover:bg-gray-100">
-                                            Download Excel
-                                        </button>
-                                        <button @click="download('PDF')" class="block w-full px-3 py-1.5 text-left hover:bg-gray-100">
-                                            Download PDF
-                                        </button>
+                                    <div v-if="showDownload" class="absolute right-0 mt-1 w-36 rounded border border-gray-200 bg-white text-sm shadow-lg">
+                                        <button @click="download('CSV')" class="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Download CSV</button>
+                                        <button @click="download('Excel')" class="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Download Excel</button>
+                                        <button @click="download('PDF')" class="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Download PDF</button>
                                     </div>
                                 </div>
                             </div>
-
                             <div class="flex items-center gap-2">
                                 <div class="flex flex-wrap gap-1">
                                     <button
@@ -587,41 +594,25 @@ const violations = ref([
                                         :key="option.value"
                                         @click="setFilter(option.value)"
                                         class="rounded px-1.5 py-0.5 text-xs"
-                                        :class="
-                                            activeFilter === option.value
-                                                ? 'bg-[#FFD700] font-semibold text-[#800000]'
-                                                : 'bg-[#FFD700]/20 text-[#B8860B]'
-                                        "
+                                        :class="activeFilter === option.value ? 'bg-[#FFD700] font-semibold text-[#800000]' : 'bg-[#FFD700]/20 text-[#B8860B]'"
                                     >
                                         {{ option.label }}
                                     </button>
                                 </div>
-
-                                <!-- Program dropdown -->
                                 <select
                                     v-model="selectedVisitProgram"
                                     class="ml-auto rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]"
                                 >
                                     <option value="all">All Programs</option>
-                                    <option value="BSIT">BSIT</option>
-                                    <option value="BSABE">BSABE</option>
-                                    <option value="BSNED">BSNED</option>
-                                    <option value="BSED">BSED</option>
+                                    <option v-for="p in visitPrograms" :key="p.code" :value="p.code">{{ p.code }}</option>
                                 </select>
                             </div>
-
-                            <!-- Show only if "custom" selected -->
                             <div v-if="activeFilter === 'custom'" class="mt-2 flex items-center gap-2">
-                                <input
-                                    type="date"
-                                    class="flex-1 rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]"
-                                />
+                                <input type="date" class="flex-1 rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]" />
                                 <span class="text-xs text-[#B8860B]">to</span>
-                                <input
-                                    type="date"
-                                    class="flex-1 rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]"
-                                />
+                                <input type="date" class="flex-1 rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]" />
                             </div>
+                            <p v-if="statsError" class="mt-1 text-center text-[10px] text-red-600">{{ statsError }}</p>
                         </div>
                     </div>
                 </div>
@@ -658,6 +649,7 @@ const violations = ref([
                 </div>
                 <!-- End Tabs Section -->
 
+                <!-- All Logs Tab Contents -->
                 <div v-if="activeTab === 'all-logs'">
                     <div class="flex items-center justify-between gap-2 py-4">
                         <div class="flex gap-2">
@@ -791,9 +783,10 @@ const violations = ref([
                         </div>
                     </div>
                 </div>
+                <!-- End All Logs Tab Contents -->
 
+                <!-- Logout by System Tab Content -->
                 <div v-else-if="activeTab === 'logout-by-system'">
-                    <!-- Logout by System Tab Content -->
                     <div class="mb-4">
                         <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
                             <div class="flex">
@@ -848,6 +841,7 @@ const violations = ref([
                         </table>
                     </div>
                 </div>
+                <!-- End Logout by System Tab Content -->
             </div>
         </div>
     </AppLayout>
