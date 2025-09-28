@@ -1,7 +1,13 @@
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3'
-import { route } from 'ziggy-js'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { valueUpdater } from '@/lib/utils';
+import { Head, router } from '@inertiajs/vue3';
+import { ChevronLeftIcon, ChevronRightIcon, DoubleArrowLeftIcon, DoubleArrowRightIcon } from '@radix-icons/vue';
 import {
     FlexRender,
     getCoreRowModel,
@@ -9,43 +15,26 @@ import {
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
-    useVueTable, VisibilityState
+    useVueTable,
+    VisibilityState,
 } from '@tanstack/vue-table';
-import { ArrowUpDown, ChevronDown, ListFilter, X } from 'lucide-vue-next';
-import { h, ref } from 'vue'
-import DropdownAction from './DataTableDemoColumn.vue'
-import { Checkbox } from '@/components/ui/checkbox'
-import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import {
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table'
-import { valueUpdater } from '@/lib/utils'
-import { ChevronRightIcon, ChevronLeftIcon, DoubleArrowLeftIcon, DoubleArrowRightIcon } from "@radix-icons/vue";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus } from 'lucide-vue-next'
+import { ArrowUpDown, ChevronDown, ListFilter, Plus, X } from 'lucide-vue-next';
+import { h, ref } from 'vue';
+import { route } from 'ziggy-js';
+import DropdownAction from './DataTableDemoColumn.vue';
 
 interface Props {
     data?: {
-        data: any[]
-        current_page?: number
-        per_page?: number
-        last_page?: number
-    }
-    filter?: any[]
-    currentSortField?: string
-    currentSortDirection?: string
-    ddcClasses?: any[]
-    availablePurposes?: { value: string, label: string }[]
+        data: any[];
+        current_page?: number;
+        per_page?: number;
+        last_page?: number;
+    };
+    filter?: any[];
+    currentSortField?: string;
+    currentSortDirection?: string;
+    ddcClasses?: any[];
+    availablePurposes?: { value: string; label: string }[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -54,11 +43,11 @@ const props = withDefaults(defineProps<Props>(), {
     currentSortField: undefined,
     currentSortDirection: 'asc',
     ddcClasses: () => [],
-    availablePurposes: () => []
-})
+    availablePurposes: () => [],
+});
 
-import type { Table, Row, Column, SortingState, ColumnFiltersState, ColumnDef } from '@tanstack/vue-table'
-type RowData = any
+import type { Column, ColumnDef, ColumnFiltersState, Row, SortingState, Table } from '@tanstack/vue-table';
+type RowData = any;
 const data = props.data.data;
 const columns: ColumnDef<RowData>[] = [
     {
@@ -69,63 +58,72 @@ const columns: ColumnDef<RowData>[] = [
     },
     {
         id: 'select',
-        header: ({ table }: { table: Table<RowData> }) => h(Checkbox, {
-            'checked': table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && 'indeterminate'),
-            'onUpdate:checked': (value: boolean) => table.toggleAllPageRowsSelected(!!value),
-            'ariaLabel': 'Select all',
-        }),
-        cell: ({ row }: { row: Row<RowData> }) => h(Checkbox, {
-            'checked': row.getIsSelected(),
-            'onUpdate:checked': (value: boolean) => row.toggleSelected(!!value),
-            'ariaLabel': 'Select row',
-        }),
+        header: ({ table }: { table: Table<RowData> }) =>
+            h(Checkbox, {
+                checked: table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && 'indeterminate'),
+                'onUpdate:checked': (value: boolean) => table.toggleAllPageRowsSelected(!!value),
+                ariaLabel: 'Select all',
+            }),
+        cell: ({ row }: { row: Row<RowData> }) =>
+            h(Checkbox, {
+                checked: row.getIsSelected(),
+                'onUpdate:checked': (value: boolean) => row.toggleSelected(!!value),
+                ariaLabel: 'Select row',
+            }),
         enableSorting: false,
         enableHiding: false,
     },
     {
         accessorKey: 'id',
         header: ({ column }: { column: Column<RowData, any> }) => {
-            return h(Button, {
-                variant: 'ghost',
-                onClick: () => {
-                    const currentSort = column.getIsSorted();
-                    if (currentSort === false) {
-                        column.toggleSorting(false);
-                    } else if (currentSort === 'asc') {
-                        column.toggleSorting(true);
-                    } else {
-                        column.clearSorting();
-                    }
+            return h(
+                Button,
+                {
+                    variant: 'ghost',
+                    onClick: () => {
+                        const currentSort = column.getIsSorted();
+                        if (currentSort === false) {
+                            column.toggleSorting(false);
+                        } else if (currentSort === 'asc') {
+                            column.toggleSorting(true);
+                        } else {
+                            column.clearSorting();
+                        }
+                    },
                 },
-            }, () => ['ID', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })])
+                () => ['ID', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
+            );
         },
-        cell: ({ row }: { row: Row<RowData> }) => h('div', { class: 'max-w-48 whitespace-normal break-words' },
-            row.getValue('id')),
+        cell: ({ row }: { row: Row<RowData> }) => h('div', { class: 'max-w-48 whitespace-normal break-words' }, row.getValue('id')),
         enableHiding: false,
     },
     {
         accessorKey: 'client',
         header: ({ column }: { column: Column<RowData, any> }) => {
-            return h(Button, {
-                variant: 'ghost',
-                onClick: () => {
-                    const currentSort = column.getIsSorted();
-                    if (currentSort === false) {
-                        column.toggleSorting(false);
-                    } else if (currentSort === 'asc') {
-                        column.toggleSorting(true);
-                    } else {
-                        column.clearSorting();
-                    }
+            return h(
+                Button,
+                {
+                    variant: 'ghost',
+                    onClick: () => {
+                        const currentSort = column.getIsSorted();
+                        if (currentSort === false) {
+                            column.toggleSorting(false);
+                        } else if (currentSort === 'asc') {
+                            column.toggleSorting(true);
+                        } else {
+                            column.clearSorting();
+                        }
+                    },
                 },
-            }, () => ['Client', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })])
+                () => ['Client', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
+            );
         },
         cell: ({ row }: { row: Row<RowData> }) => {
             const user = row.original.user;
             if (user) {
-                return h('div', user.first_name + ' ' + user.last_name || 'Unknown')
+                return h('div', user.first_name + ' ' + user.last_name || 'Unknown');
             } else {
-                return h('div', 'no user')
+                return h('div', 'no user');
             }
         },
         enableHiding: false,
@@ -133,43 +131,49 @@ const columns: ColumnDef<RowData>[] = [
     {
         accessorKey: 'entry_time',
         header: ({ column }: { column: Column<RowData, any> }) => {
-            return h(Button, {
-                variant: 'ghost',
-                onClick: () => {
-                    const currentSort = column.getIsSorted();
-                    if (currentSort === false) {
-                        column.toggleSorting(false);
-                    } else if (currentSort === 'asc') {
-                        column.toggleSorting(true);
-                    } else {
-                        column.clearSorting();
-                    }
+            return h(
+                Button,
+                {
+                    variant: 'ghost',
+                    onClick: () => {
+                        const currentSort = column.getIsSorted();
+                        if (currentSort === false) {
+                            column.toggleSorting(false);
+                        } else if (currentSort === 'asc') {
+                            column.toggleSorting(true);
+                        } else {
+                            column.clearSorting();
+                        }
+                    },
                 },
-            }, () => ['Entry Time', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })])
+                () => ['Entry Time', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
+            );
         },
-        cell: ({ row }: { row: Row<RowData> }) => h('div', { class: 'max-w-48 whitespace-normal break-words' },
-            row.getValue('entry_time')),
+        cell: ({ row }: { row: Row<RowData> }) => h('div', { class: 'max-w-48 whitespace-normal break-words' }, row.getValue('entry_time')),
         enableHiding: false,
     },
     {
         accessorKey: 'exit_time',
         header: ({ column }: { column: Column<RowData, any> }) => {
-            return h(Button, {
-                variant: 'ghost',
-                onClick: () => {
-                    const currentSort = column.getIsSorted();
-                    if (currentSort === false) {
-                        column.toggleSorting(false);
-                    } else if (currentSort === 'asc') {
-                        column.toggleSorting(true);
-                    } else {
-                        column.clearSorting();
-                    }
+            return h(
+                Button,
+                {
+                    variant: 'ghost',
+                    onClick: () => {
+                        const currentSort = column.getIsSorted();
+                        if (currentSort === false) {
+                            column.toggleSorting(false);
+                        } else if (currentSort === 'asc') {
+                            column.toggleSorting(true);
+                        } else {
+                            column.clearSorting();
+                        }
+                    },
                 },
-            }, () => ['Exit Time', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })])
+                () => ['Exit Time', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
+            );
         },
-        cell: ({ row }: { row: Row<RowData> }) => h('div', { class: 'max-w-48 whitespace-normal break-words' },
-            row.getValue('exit_time')),
+        cell: ({ row }: { row: Row<RowData> }) => h('div', { class: 'max-w-48 whitespace-normal break-words' }, row.getValue('exit_time')),
         enableHiding: false,
     },
     {
@@ -178,9 +182,9 @@ const columns: ColumnDef<RowData>[] = [
         cell: ({ row }: { row: Row<RowData> }) => {
             const purpose = row.original.visit_purpose;
             if (purpose) {
-                return h('div', purpose.name || 'Unknown')
+                return h('div', purpose.name || 'Unknown');
             } else {
-                return h('div', 'not specified')
+                return h('div', 'not specified');
             }
         },
     },
@@ -188,34 +192,40 @@ const columns: ColumnDef<RowData>[] = [
         id: 'actions',
         enableHiding: false,
         cell: ({ row }: { row: Row<RowData> }) => {
-            const payment = row.original
-            return h('div', { class: 'relative' }, h(DropdownAction, {
-                payment,
-                onExpand: row.toggleExpanded,
-            }))
+            const payment = row.original;
+            return h(
+                'div',
+                { class: 'relative' },
+                h(DropdownAction, {
+                    payment,
+                    onExpand: row.toggleExpanded,
+                }),
+            );
         },
     },
-]
+];
 
 const sorting = ref<SortingState>(
-    props.currentSortField ? [{
-        id: props.currentSortField,
-        desc: props.currentSortDirection === 'desc'
-    }] : []
-)
-const columnFilters = ref<ColumnFiltersState>(
-    props.filter ? props.filter.map(f => ({ id: f.id, value: f.value })) : []
-)
+    props.currentSortField
+        ? [
+              {
+                  id: props.currentSortField,
+                  desc: props.currentSortDirection === 'desc',
+              },
+          ]
+        : [],
+);
+const columnFilters = ref<ColumnFiltersState>(props.filter ? props.filter.map((f) => ({ id: f.id, value: f.value })) : []);
 const columnVisibility = ref<VisibilityState>({
     search: false,
-})
-const rowSelection = ref({})
-const expanded = ref({})
+});
+const rowSelection = ref({});
+const expanded = ref({});
 const pageSizes = [1, 2, 3, 5, 10, 15, 30, 40, 50, 100];
 const pagination = ref({
     pageIndex: (props.data?.current_page ?? 1) - 1,
     pageSize: props.data?.per_page ?? 10,
-})
+});
 
 const table = useVueTable({
     data,
@@ -229,23 +239,23 @@ const table = useVueTable({
     manualPagination: true,
     manualSorting: true,
     manualFiltering: true,
-    onPaginationChange: updater => {
+    onPaginationChange: (updater) => {
         if (typeof updater === 'function') {
             pagination.value = updater(pagination.value);
         } else {
             pagination.value = updater;
         }
 
-        let filters: Record<string, any> = {}
+        let filters: Record<string, any> = {};
         if (columnFilters.value && columnFilters.value.length > 0) {
             filters = columnFilters.value.reduce((acc: Record<string, any>, filter) => {
                 if (Array.isArray(filter.value) && filter.value.length > 0) {
-                    acc[filter.id] = filter.value
+                    acc[filter.id] = filter.value;
                 } else if (!Array.isArray(filter.value) && filter.value !== '' && filter.value !== null && filter.value !== undefined) {
-                    acc[filter.id] = filter.value
+                    acc[filter.id] = filter.value;
                 }
-                return acc
-            }, {})
+                return acc;
+            }, {});
         }
 
         router.get(
@@ -254,30 +264,30 @@ const table = useVueTable({
                 page: pagination.value.pageIndex + 1,
                 per_page: pagination.value.pageSize,
                 sort_field: sorting.value[0]?.id,
-                sort_direction: sorting.value.length == 0 ? undefined : (sorting.value[0]?.desc ? "desc" : "asc"),
+                sort_direction: sorting.value.length == 0 ? undefined : sorting.value[0]?.desc ? 'desc' : 'asc',
                 search: filters.search,
-                visit_purpose_id: filters.visit_purpose_id
+                visit_purpose_id: filters.visit_purpose_id,
             },
-            { preserveState: false, preserveScroll: true }
+            { preserveState: false, preserveScroll: true },
         );
     },
-    onSortingChange: updaterOrValue => {
+    onSortingChange: (updaterOrValue) => {
         if (typeof updaterOrValue === 'function') {
-            sorting.value = updaterOrValue(sorting.value)
+            sorting.value = updaterOrValue(sorting.value);
         } else {
-            sorting.value = updaterOrValue
+            sorting.value = updaterOrValue;
         }
 
-        let filters: Record<string, any> = {}
+        let filters: Record<string, any> = {};
         if (columnFilters.value && columnFilters.value.length > 0) {
             filters = columnFilters.value.reduce((acc: Record<string, any>, filter) => {
                 if (Array.isArray(filter.value) && filter.value.length > 0) {
-                    acc[filter.id] = filter.value
+                    acc[filter.id] = filter.value;
                 } else if (!Array.isArray(filter.value) && filter.value !== '' && filter.value !== null && filter.value !== undefined) {
-                    acc[filter.id] = filter.value
+                    acc[filter.id] = filter.value;
                 }
-                return acc
-            }, {})
+                return acc;
+            }, {});
         }
 
         router.get(
@@ -286,30 +296,30 @@ const table = useVueTable({
                 page: 1,
                 per_page: pagination.value.pageSize,
                 sort_field: sorting.value[0]?.id,
-                sort_direction: sorting.value.length == 0 ? undefined : (sorting.value[0]?.desc ? "desc" : "asc"),
+                sort_direction: sorting.value.length == 0 ? undefined : sorting.value[0]?.desc ? 'desc' : 'asc',
                 search: filters.search,
-                visit_purpose_id: filters.visit_purpose_id
+                visit_purpose_id: filters.visit_purpose_id,
             },
-            { preserveState: false, preserveScroll: true }
+            { preserveState: false, preserveScroll: true },
         );
     },
-    onColumnFiltersChange: updaterOrValue => {
+    onColumnFiltersChange: (updaterOrValue) => {
         if (typeof updaterOrValue === 'function') {
-            columnFilters.value = updaterOrValue(columnFilters.value)
+            columnFilters.value = updaterOrValue(columnFilters.value);
         } else {
-            columnFilters.value = updaterOrValue
+            columnFilters.value = updaterOrValue;
         }
 
-        let filters: Record<string, any> = {}
+        let filters: Record<string, any> = {};
         if (columnFilters.value && columnFilters.value.length > 0) {
             filters = columnFilters.value.reduce((acc: Record<string, any>, filter) => {
                 if (Array.isArray(filter.value) && filter.value.length > 0) {
-                    acc[filter.id] = filter.value
+                    acc[filter.id] = filter.value;
                 } else if (!Array.isArray(filter.value) && filter.value !== '' && filter.value !== null && filter.value !== undefined) {
-                    acc[filter.id] = filter.value
+                    acc[filter.id] = filter.value;
                 }
-                return acc
-            }, {})
+                return acc;
+            }, {});
         }
 
         router.get(
@@ -318,64 +328,74 @@ const table = useVueTable({
                 page: 1,
                 per_page: pagination.value.pageSize,
                 sort_field: sorting.value[0]?.id,
-                sort_direction: sorting.value.length == 0 ? undefined : (sorting.value[0]?.desc ? "desc" : "asc"),
+                sort_direction: sorting.value.length == 0 ? undefined : sorting.value[0]?.desc ? 'desc' : 'asc',
                 search: filters.search,
-                visit_purpose_id: filters.visit_purpose_id
+                visit_purpose_id: filters.visit_purpose_id,
             },
-            { preserveState: false, preserveScroll: true }
+            { preserveState: false, preserveScroll: true },
         );
     },
-    onColumnVisibilityChange: updaterOrValue => {
+    onColumnVisibilityChange: (updaterOrValue) => {
         if (typeof updaterOrValue === 'function') {
-            columnVisibility.value = updaterOrValue(columnVisibility.value)
+            columnVisibility.value = updaterOrValue(columnVisibility.value);
         } else {
-            columnVisibility.value = updaterOrValue
+            columnVisibility.value = updaterOrValue;
         }
     },
-    onRowSelectionChange: updaterOrValue => valueUpdater(updaterOrValue, rowSelection),
-    onExpandedChange: updaterOrValue => valueUpdater(updaterOrValue, expanded),
+    onRowSelectionChange: (updaterOrValue) => valueUpdater(updaterOrValue, rowSelection),
+    onExpandedChange: (updaterOrValue) => valueUpdater(updaterOrValue, expanded),
     state: {
-        get sorting() { return sorting.value },
-        get columnFilters() { return columnFilters.value },
-        get columnVisibility() { return columnVisibility.value },
-        get rowSelection() { return rowSelection.value },
-        get expanded() { return expanded.value },
-        get pagination() { return pagination.value },
+        get sorting() {
+            return sorting.value;
+        },
+        get columnFilters() {
+            return columnFilters.value;
+        },
+        get columnVisibility() {
+            return columnVisibility.value;
+        },
+        get rowSelection() {
+            return rowSelection.value;
+        },
+        get expanded() {
+            return expanded.value;
+        },
+        get pagination() {
+            return pagination.value;
+        },
     },
-})
+});
 
-const filterInput = ref<string>((table.getColumn('search')?.getFilterValue() as string) ?? '')
+const filterInput = ref<string>((table.getColumn('search')?.getFilterValue() as string) ?? '');
 const applyFilter = () => {
-    table.getColumn('search')?.setFilterValue(filterInput.value)
-}
+    table.getColumn('search')?.setFilterValue(filterInput.value);
+};
 const clearFilter = () => {
-    filterInput.value = ''
-    table.getColumn('search')?.setFilterValue('')
-}
+    filterInput.value = '';
+    table.getColumn('search')?.setFilterValue('');
+};
 
-import Filter from './Filter.vue'
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
+import Filter from './Filter.vue';
 
 // Filter for visit purpose
 const filter_purposes = {
     title: 'Filter Purpose',
     column: 'visit_purpose_id',
-    data: props.availablePurposes.map(purpose => ({
+    data: props.availablePurposes.map((purpose) => ({
         value: purpose.value,
         label: purpose.label,
-        icon: h(ListFilter)
-    }))
-}
+        icon: h(ListFilter),
+    })),
+};
 
-const filter_toolbar = [
-    filter_purposes,
-];
+const filter_toolbar = [filter_purposes];
 
 const showDialog = ref(false);
 const showDialogCreate = () => {
-    showDialog.value = true
-}
+    showDialog.value = true;
+};
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -384,15 +404,15 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-import { ref, computed } from "vue";
+import { computed } from 'vue';
 
 // Dropdown + filters
 const showDownload = ref(false);
-const activeFilter = ref("day");
+const activeFilter = ref('day');
 
 // Program selections
-const selectedVisitProgram = ref("all");
-const selectedLibraryProgram = ref("all");
+const selectedVisitProgram = ref('all');
+const selectedLibraryProgram = ref('all');
 
 // Fake data
 const libraryData = {
@@ -412,10 +432,10 @@ const visitData = {
 };
 
 const filters = [
-    { label: "Day", value: "day" },
-    { label: "Week", value: "week" },
-    { label: "Month", value: "month" },
-    { label: "Custom", value: "custom" },
+    { label: 'Day', value: 'day' },
+    { label: 'Week', value: 'week' },
+    { label: 'Month', value: 'month' },
+    { label: 'Custom', value: 'custom' },
 ];
 
 function toggleDropdown() {
@@ -441,19 +461,12 @@ const visitCount = computed(() => {
 });
 
 const visitTitle = computed(() => {
-    const filterLabel =
-        activeFilter.value === "day"
-            ? "Today"
-            : activeFilter.value.charAt(0).toUpperCase() + activeFilter.value.slice(1);
+    const filterLabel = activeFilter.value === 'day' ? 'Today' : activeFilter.value.charAt(0).toUpperCase() + activeFilter.value.slice(1);
 
-    if (selectedVisitProgram.value === "all") {
-        return activeFilter.value === "day"
-            ? "Visits Today"
-            : `Visits (${filterLabel})`;
+    if (selectedVisitProgram.value === 'all') {
+        return activeFilter.value === 'day' ? 'Visits Today' : `Visits (${filterLabel})`;
     } else {
-        return activeFilter.value === "day"
-            ? `${selectedVisitProgram.value} Visits`
-            : `${selectedVisitProgram.value} Visits (${filterLabel})`;
+        return activeFilter.value === 'day' ? `${selectedVisitProgram.value} Visits` : `${selectedVisitProgram.value} Visits (${filterLabel})`;
     }
 });
 
@@ -463,35 +476,34 @@ const activeTab = ref<'all-logs' | 'logout-by-system'>('all-logs');
 // Static demo data
 const violations = ref([
     {
-        studentId: "2021001",
-        name: "Juan Dela Cruz",
-        course: "BSIT",
-        logoutTime: "8:45 PM",
-        violation: "Auto Logout after hours",
+        studentId: '2021001',
+        name: 'Juan Dela Cruz',
+        course: 'BSIT',
+        logoutTime: '8:45 PM',
+        violation: 'Auto Logout after hours',
     },
     {
-        studentId: "2021042",
-        name: "Maria Santos",
-        course: "BSABE",
-        logoutTime: "9:10 PM",
-        violation: "Auto Logout after hours",
+        studentId: '2021042',
+        name: 'Maria Santos',
+        course: 'BSABE',
+        logoutTime: '9:10 PM',
+        violation: 'Auto Logout after hours',
     },
     {
-        studentId: "2021089",
-        name: "Pedro Reyes",
-        course: "BSNED",
-        logoutTime: "8:30 PM",
-        violation: "Auto Logout after hours",
+        studentId: '2021089',
+        name: 'Pedro Reyes',
+        course: 'BSNED',
+        logoutTime: '8:30 PM',
+        violation: 'Auto Logout after hours',
     },
     {
-        studentId: "2021056",
-        name: "Yahzee Jon",
-        course: "BSED",
-        logoutTime: "8:21 PM",
-        violation: "Auto Logout after hours",
+        studentId: '2021056',
+        name: 'Yahzee Jon',
+        course: 'BSED',
+        logoutTime: '8:21 PM',
+        violation: 'Auto Logout after hours',
     },
 ]);
-
 </script>
 
 <template>
@@ -499,19 +511,18 @@ const violations = ref([
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="p-4">
             <div class="w-full">
-
                 <!-- Visits Card Section -->
-                <div class="flex flex-row flex-wrap gap-4 mb-6">
+                <div class="mb-6 flex flex-row flex-wrap gap-4">
                     <div class="flex flex-1 gap-4">
                         <!-- Currently in Library Card -->
-                        <div class="flex-1 bg-white rounded-2xl shadow-lg p-3 border-2 border-[#800000]">
-                            <div class="flex items-center justify-between mb-1">
+                        <div class="flex-1 rounded-2xl border-2 border-[#800000] bg-white p-3 shadow-lg">
+                            <div class="mb-1 flex items-center justify-between">
                                 <span class="text-sm font-bold text-[#800000]">Currently in Library</span>
 
                                 <!-- Program dropdown -->
                                 <select
                                     v-model="selectedLibraryProgram"
-                                    class="text-xs border border-[#FFD700] rounded px-2 py-0.5 focus:ring-1 focus:ring-[#FFD700] outline-none"
+                                    class="rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]"
                                 >
                                     <option value="all">All Programs</option>
                                     <option value="BSIT">BSIT</option>
@@ -522,41 +533,49 @@ const violations = ref([
                             </div>
 
                             <!-- Centered larger number -->
-                            <div class="flex justify-center items-center py-1">
-          <span class="text-3xl font-extrabold text-[#800000] bg-[#FFD700]/20 rounded-full w-14 h-14 flex items-center justify-center">
-            {{ currentLibraryCount }}
-          </span>
+                            <div class="flex items-center justify-center py-1">
+                                <span
+                                    class="flex h-14 w-14 items-center justify-center rounded-full bg-[#FFD700]/20 text-3xl font-extrabold text-[#800000]"
+                                >
+                                    {{ currentLibraryCount }}
+                                </span>
                             </div>
                         </div>
 
                         <!-- Visits Today Card -->
-                        <div class="flex-1 bg-white rounded-2xl shadow-lg p-3 border-2 border-[#FFD700]">
-                            <div class="flex items-center justify-between mb-2">
+                        <div class="flex-1 rounded-2xl border-2 border-[#FFD700] bg-white p-3 shadow-lg">
+                            <div class="mb-2 flex items-center justify-between">
                                 <div class="flex items-center gap-2">
-            <span class="text-sm font-bold text-[#B8860B]">
-              {{ visitTitle }}
-            </span>
-                                    <span class="text-sm px-2 py-0.5 rounded bg-[#800000]/30 text-[#FFD700] font-bold">
-              {{ visitCount }}
-            </span>
+                                    <span class="text-sm font-bold text-[#B8860B]">
+                                        {{ visitTitle }}
+                                    </span>
+                                    <span class="rounded bg-[#800000]/30 px-2 py-0.5 text-sm font-bold text-[#FFD700]">
+                                        {{ visitCount }}
+                                    </span>
                                 </div>
 
                                 <!-- Download dropdown -->
                                 <div class="relative">
                                     <button
                                         @click="toggleDropdown"
-                                        class="text-xs h-7 bg-[#FFD700] text-[#800000] hover:bg-[#B8860B] hover:text-white px-2 py-0.5 rounded flex items-center"
+                                        class="flex h-7 items-center rounded bg-[#FFD700] px-2 py-0.5 text-xs text-[#800000] hover:bg-[#B8860B] hover:text-white"
                                     >
                                         Download
                                         <span class="ml-1">▼</span>
                                     </button>
                                     <div
                                         v-if="showDownload"
-                                        class="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg text-sm"
+                                        class="absolute right-0 mt-1 w-36 rounded border border-gray-200 bg-white text-sm shadow-lg"
                                     >
-                                        <button @click="download('CSV')" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100">Download CSV</button>
-                                        <button @click="download('Excel')" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100">Download Excel</button>
-                                        <button @click="download('PDF')" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100">Download PDF</button>
+                                        <button @click="download('CSV')" class="block w-full px-3 py-1.5 text-left hover:bg-gray-100">
+                                            Download CSV
+                                        </button>
+                                        <button @click="download('Excel')" class="block w-full px-3 py-1.5 text-left hover:bg-gray-100">
+                                            Download Excel
+                                        </button>
+                                        <button @click="download('PDF')" class="block w-full px-3 py-1.5 text-left hover:bg-gray-100">
+                                            Download PDF
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -567,10 +586,12 @@ const violations = ref([
                                         v-for="option in filters"
                                         :key="option.value"
                                         @click="setFilter(option.value)"
-                                        class="px-1.5 py-0.5 text-xs rounded"
-                                        :class="activeFilter === option.value
-                ? 'bg-[#FFD700] text-[#800000] font-semibold'
-                : 'bg-[#FFD700]/20 text-[#B8860B]'"
+                                        class="rounded px-1.5 py-0.5 text-xs"
+                                        :class="
+                                            activeFilter === option.value
+                                                ? 'bg-[#FFD700] font-semibold text-[#800000]'
+                                                : 'bg-[#FFD700]/20 text-[#B8860B]'
+                                        "
                                     >
                                         {{ option.label }}
                                     </button>
@@ -579,7 +600,7 @@ const violations = ref([
                                 <!-- Program dropdown -->
                                 <select
                                     v-model="selectedVisitProgram"
-                                    class="text-xs ml-auto border border-[#FFD700] rounded px-2 py-0.5 focus:ring-1 focus:ring-[#FFD700] outline-none"
+                                    class="ml-auto rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]"
                                 >
                                     <option value="all">All Programs</option>
                                     <option value="BSIT">BSIT</option>
@@ -590,10 +611,16 @@ const violations = ref([
                             </div>
 
                             <!-- Show only if "custom" selected -->
-                            <div v-if="activeFilter === 'custom'" class="flex gap-2 mt-2 items-center">
-                                <input type="date" class="flex-1 text-xs border border-[#FFD700] rounded px-2 py-0.5 focus:ring-1 focus:ring-[#FFD700] outline-none" />
+                            <div v-if="activeFilter === 'custom'" class="mt-2 flex items-center gap-2">
+                                <input
+                                    type="date"
+                                    class="flex-1 rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]"
+                                />
                                 <span class="text-xs text-[#B8860B]">to</span>
-                                <input type="date" class="flex-1 text-xs border border-[#FFD700] rounded px-2 py-0.5 focus:ring-1 focus:ring-[#FFD700] outline-none" />
+                                <input
+                                    type="date"
+                                    class="flex-1 rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]"
+                                />
                             </div>
                         </div>
                     </div>
@@ -607,22 +634,22 @@ const violations = ref([
                             <button
                                 @click="activeTab = 'all-logs'"
                                 :class="[
-                          activeTab === 'all-logs'
-                            ? 'border-[#800000] text-[#800000]'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                          'whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'
-                        ]"
+                                    activeTab === 'all-logs'
+                                        ? 'border-[#800000] text-[#800000]'
+                                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
+                                    'border-b-2 px-1 py-2 text-sm font-medium whitespace-nowrap',
+                                ]"
                             >
                                 All Logs
                             </button>
                             <button
                                 @click="activeTab = 'logout-by-system'"
                                 :class="[
-                          activeTab === 'logout-by-system'
-                            ? 'border-[#800000] text-[#800000]'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                          'whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'
-                        ]"
+                                    activeTab === 'logout-by-system'
+                                        ? 'border-[#800000] text-[#800000]'
+                                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
+                                    'border-b-2 px-1 py-2 text-sm font-medium whitespace-nowrap',
+                                ]"
                             >
                                 Logout by System
                             </button>
@@ -631,9 +658,8 @@ const violations = ref([
                 </div>
                 <!-- End Tabs Section -->
 
-
                 <div v-if="activeTab === 'all-logs'">
-                    <div class="flex gap-2 items-center justify-between py-4">
+                    <div class="flex items-center justify-between gap-2 py-4">
                         <div class="flex gap-2">
                             <div class="relative">
                                 <Input
@@ -643,12 +669,7 @@ const violations = ref([
                                     @keyup.enter="applyFilter"
                                     @blur="applyFilter"
                                 />
-                                <Button
-                                    v-if="filterInput"
-                                    variant="ghost"
-                                    class="absolute right-0 top-0 h-full px-2"
-                                    @click="clearFilter"
-                                >
+                                <Button v-if="filterInput" variant="ghost" class="absolute top-0 right-0 h-full px-2" @click="clearFilter">
                                     <X class="h-4 w-4" />
                                 </Button>
                             </div>
@@ -669,13 +690,17 @@ const violations = ref([
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuCheckboxItem v-for="column in
-                                table.getAllColumns().filter((column) => column.getCanHide())"
-                                                              :key="column.id" class="capitalize"
-                                                              :checked="column.getIsVisible()"
-                                                              @update:checked="(value: boolean | 'indeterminate') => {
-                                                          column.toggleVisibility(!!value)
-                                                        }">
+                                    <DropdownMenuCheckboxItem
+                                        v-for="column in table.getAllColumns().filter((column) => column.getCanHide())"
+                                        :key="column.id"
+                                        class="capitalize"
+                                        :checked="column.getIsVisible()"
+                                        @update:checked="
+                                            (value: boolean | 'indeterminate') => {
+                                                column.toggleVisibility(!!value);
+                                            }
+                                        "
+                                    >
                                         {{ column.id }}
                                     </DropdownMenuCheckboxItem>
                                 </DropdownMenuContent>
@@ -688,7 +713,11 @@ const violations = ref([
                             <TableHeader>
                                 <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
                                     <TableHead v-for="header in headerGroup.headers" :key="header.id">
-                                        <FlexRender v-if="!header.isPlaceholder" :render="header.column.columnDef.header" :props="header.getContext()" />
+                                        <FlexRender
+                                            v-if="!header.isPlaceholder"
+                                            :render="header.column.columnDef.header"
+                                            :props="header.getContext()"
+                                        />
                                     </TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -708,9 +737,7 @@ const violations = ref([
                                     </template>
                                 </template>
                                 <TableRow v-else>
-                                    <TableCell :colspan="columns.length" class="h-24 text-center">
-                                        No results.
-                                    </TableCell>
+                                    <TableCell :colspan="columns.length" class="h-24 text-center"> No results. </TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
@@ -718,12 +745,14 @@ const violations = ref([
 
                     <div class="flex items-center justify-end space-x-2 py-4">
                         <div class="flex-1 text-sm text-muted-foreground">
-                            {{ table.getFilteredSelectedRowModel().rows.length }} of
-                            {{ table.getFilteredRowModel().rows.length }} row(s) selected.
+                            {{ table.getFilteredSelectedRowModel().rows.length }} of {{ table.getFilteredRowModel().rows.length }} row(s) selected.
                         </div>
                         <div class="flex items-center space-x-2">
                             <p class="text-sm font-medium">Rows per page</p>
-                            <Select :model-value="table.getState().pagination.pageSize.toString()" @update:model-value="(value) => table.setPageSize(Number(value))">
+                            <Select
+                                :model-value="table.getState().pagination.pageSize.toString()"
+                                @update:model-value="(value) => table.setPageSize(Number(value))"
+                            >
                                 <SelectTrigger class="h-8 w-[70px]">
                                     <SelectValue :placeholder="table.getState().pagination.pageSize.toString()" />
                                 </SelectTrigger>
@@ -736,7 +765,12 @@ const violations = ref([
                         </div>
                         <div class="space-x-2">
                             <div class="flex items-center space-x-2">
-                                <Button variant="outline" class="hidden h-8 w-8 p-0 lg:flex" :disabled="!table.getCanPreviousPage()" @click="table.setPageIndex(0)">
+                                <Button
+                                    variant="outline"
+                                    class="hidden h-8 w-8 p-0 lg:flex"
+                                    :disabled="!table.getCanPreviousPage()"
+                                    @click="table.setPageIndex(0)"
+                                >
                                     <DoubleArrowLeftIcon class="h-4 w-4" />
                                 </Button>
                                 <Button variant="outline" class="h-8 w-8 p-0" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
@@ -745,7 +779,12 @@ const violations = ref([
                                 <Button variant="outline" class="h-8 w-8 p-0" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
                                     <ChevronRightIcon class="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" class="hidden h-8 w-8 p-0 lg:flex" :disabled="!table.getCanNextPage()" @click="table.setPageIndex(table.getPageCount() - 1)">
+                                <Button
+                                    variant="outline"
+                                    class="hidden h-8 w-8 p-0 lg:flex"
+                                    :disabled="!table.getCanNextPage()"
+                                    @click="table.setPageIndex(table.getPageCount() - 1)"
+                                >
                                     <DoubleArrowRightIcon class="h-4 w-4" />
                                 </Button>
                             </div>
@@ -756,14 +795,10 @@ const violations = ref([
                 <div v-else-if="activeTab === 'logout-by-system'">
                     <!-- Logout by System Tab Content -->
                     <div class="mb-4">
-                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
                             <div class="flex">
                                 <div class="flex-shrink-0">
-                                    <svg
-                                        class="h-5 w-5 text-yellow-400"
-                                        viewBox="0 0 20 20"
-                                        fill="currentColor"
-                                    >
+                                    <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
                                         <path
                                             fill-rule="evenodd"
                                             d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
@@ -772,13 +807,11 @@ const violations = ref([
                                     </svg>
                                 </div>
                                 <div class="ml-3">
-                                    <h3 class="text-sm font-medium text-yellow-800">
-                                        Library Hours: 8:00 AM - 8:00 PM
-                                    </h3>
+                                    <h3 class="text-sm font-medium text-yellow-800">Library Hours: 8:00 AM - 8:00 PM</h3>
                                     <div class="mt-2 text-sm text-yellow-700">
                                         <p>
-                                            Users who remain logged in after 8:00 PM will be automatically
-                                            logged out by the system and recorded as violations.
+                                            Users who remain logged in after 8:00 PM will be automatically logged out by the system and recorded as
+                                            violations.
                                         </p>
                                     </div>
                                 </div>
@@ -790,29 +823,27 @@ const violations = ref([
                     <div class="rounded-md border">
                         <table class="w-full text-sm">
                             <thead class="bg-gray-100">
-                            <tr>
-                                <th class="px-3 py-2 text-left">Student ID</th>
-                                <th class="px-3 py-2 text-left">Name</th>
-                                <th class="px-3 py-2 text-left">Course/Program</th>
-                                <th class="px-3 py-2 text-left">Logout Time</th>
-                                <th class="px-3 py-2 text-left">Violation</th>
-                            </tr>
+                                <tr>
+                                    <th class="px-3 py-2 text-left">Student ID</th>
+                                    <th class="px-3 py-2 text-left">Name</th>
+                                    <th class="px-3 py-2 text-left">Course/Program</th>
+                                    <th class="px-3 py-2 text-left">Logout Time</th>
+                                    <th class="px-3 py-2 text-left">Violation</th>
+                                </tr>
                             </thead>
                             <tbody>
-                            <tr v-if="violations.length === 0">
-                                <td colspan="5" class="h-24 text-center text-gray-500">
-                                    No system logout violations found.
-                                </td>
-                            </tr>
-                            <tr v-for="(item, index) in violations" :key="index" class="border-t">
-                                <td class="px-3 py-2">{{ item.studentId }}</td>
-                                <td class="px-3 py-2">{{ item.name }}</td>
-                                <td class="px-3 py-2">{{ item.course }}</td>
-                                <td class="px-3 py-2">{{ item.logoutTime }}</td>
-                                <td class="px-3 py-2 text-red-600 font-semibold">
-                                    {{ item.violation }}
-                                </td>
-                            </tr>
+                                <tr v-if="violations.length === 0">
+                                    <td colspan="5" class="h-24 text-center text-gray-500">No system logout violations found.</td>
+                                </tr>
+                                <tr v-for="(item, index) in violations" :key="index" class="border-t">
+                                    <td class="px-3 py-2">{{ item.studentId }}</td>
+                                    <td class="px-3 py-2">{{ item.name }}</td>
+                                    <td class="px-3 py-2">{{ item.course }}</td>
+                                    <td class="px-3 py-2">{{ item.logoutTime }}</td>
+                                    <td class="px-3 py-2 font-semibold text-red-600">
+                                        {{ item.violation }}
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
