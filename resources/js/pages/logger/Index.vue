@@ -383,6 +383,115 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/logger',
     },
 ];
+
+import { ref, computed } from "vue";
+
+// Dropdown + filters
+const showDownload = ref(false);
+const activeFilter = ref("day");
+
+// Program selections
+const selectedVisitProgram = ref("all");
+const selectedLibraryProgram = ref("all");
+
+// Fake data
+const libraryData = {
+    all: 128,
+    BSIT: 52,
+    BSABE: 38,
+    BSNED: 15,
+    BSED: 23,
+};
+
+const visitData = {
+    all: 45,
+    BSIT: 20,
+    BSABE: 15,
+    BSNED: 10,
+    BSED: 5,
+};
+
+const filters = [
+    { label: "Day", value: "day" },
+    { label: "Week", value: "week" },
+    { label: "Month", value: "month" },
+    { label: "Custom", value: "custom" },
+];
+
+function toggleDropdown() {
+    showDownload.value = !showDownload.value;
+}
+
+function setFilter(filter) {
+    activeFilter.value = filter;
+}
+
+function download(type) {
+    alert(`Downloading ${type}...`);
+}
+
+// Computed for "Currently in Library"
+const currentLibraryCount = computed(() => {
+    return libraryData[selectedLibraryProgram.value] ?? libraryData.all;
+});
+
+// Computed for "Visits Today"
+const visitCount = computed(() => {
+    return visitData[selectedVisitProgram.value] ?? visitData.all;
+});
+
+const visitTitle = computed(() => {
+    const filterLabel =
+        activeFilter.value === "day"
+            ? "Today"
+            : activeFilter.value.charAt(0).toUpperCase() + activeFilter.value.slice(1);
+
+    if (selectedVisitProgram.value === "all") {
+        return activeFilter.value === "day"
+            ? "Visits Today"
+            : `Visits (${filterLabel})`;
+    } else {
+        return activeFilter.value === "day"
+            ? `${selectedVisitProgram.value} Visits`
+            : `${selectedVisitProgram.value} Visits (${filterLabel})`;
+    }
+});
+
+// Tab state
+const activeTab = ref<'all-logs' | 'logout-by-system'>('all-logs');
+
+// Static demo data
+const violations = ref([
+    {
+        studentId: "2021001",
+        name: "Juan Dela Cruz",
+        course: "BSIT",
+        logoutTime: "8:45 PM",
+        violation: "Auto Logout after hours",
+    },
+    {
+        studentId: "2021042",
+        name: "Maria Santos",
+        course: "BSABE",
+        logoutTime: "9:10 PM",
+        violation: "Auto Logout after hours",
+    },
+    {
+        studentId: "2021089",
+        name: "Pedro Reyes",
+        course: "BSNED",
+        logoutTime: "8:30 PM",
+        violation: "Auto Logout after hours",
+    },
+    {
+        studentId: "2021056",
+        name: "Yahzee Jon",
+        course: "BSED",
+        logoutTime: "8:21 PM",
+        violation: "Auto Logout after hours",
+    },
+]);
+
 </script>
 
 <template>
@@ -390,120 +499,322 @@ const breadcrumbs: BreadcrumbItem[] = [
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="p-4">
             <div class="w-full">
-                <div class="flex gap-2 items-center justify-between py-4">
-                    <div class="flex gap-2">
-                        <div class="relative">
-                            <Input
-                                class="w-[320px] pr-8"
-                                placeholder="Search by ID or Client..."
-                                v-model="filterInput"
-                                @keyup.enter="applyFilter"
-                                @blur="applyFilter"
-                            />
-                            <Button
-                                v-if="filterInput"
-                                variant="ghost"
-                                class="absolute right-0 top-0 h-full px-2"
-                                @click="clearFilter"
-                            >
-                                <X class="h-4 w-4" />
-                            </Button>
+
+                <!-- Visits Card Section -->
+                <div class="flex flex-row flex-wrap gap-4 mb-6">
+                    <div class="flex flex-1 gap-4">
+                        <!-- Currently in Library Card -->
+                        <div class="flex-1 bg-white rounded-2xl shadow-lg p-3 border-2 border-[#800000]">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-bold text-[#800000]">Currently in Library</span>
+
+                                <!-- Program dropdown -->
+                                <select
+                                    v-model="selectedLibraryProgram"
+                                    class="text-xs border border-[#FFD700] rounded px-2 py-0.5 focus:ring-1 focus:ring-[#FFD700] outline-none"
+                                >
+                                    <option value="all">All Programs</option>
+                                    <option value="BSIT">BSIT</option>
+                                    <option value="BSABE">BSABE</option>
+                                    <option value="BSNED">BSNED</option>
+                                    <option value="BSED">BSED</option>
+                                </select>
+                            </div>
+
+                            <!-- Centered larger number -->
+                            <div class="flex justify-center items-center py-1">
+          <span class="text-3xl font-extrabold text-[#800000] bg-[#FFD700]/20 rounded-full w-14 h-14 flex items-center justify-center">
+            {{ currentLibraryCount }}
+          </span>
+                            </div>
                         </div>
-                        <div v-for="filter in filter_toolbar" :key="filter.title">
-                            <Filter :column="table.getColumn(filter.column)" :title="filter.title" :options="filter.data"></Filter>
+
+                        <!-- Visits Today Card -->
+                        <div class="flex-1 bg-white rounded-2xl shadow-lg p-3 border-2 border-[#FFD700]">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-[#B8860B]">
+              {{ visitTitle }}
+            </span>
+                                    <span class="text-sm px-2 py-0.5 rounded bg-[#800000]/30 text-[#FFD700] font-bold">
+              {{ visitCount }}
+            </span>
+                                </div>
+
+                                <!-- Download dropdown -->
+                                <div class="relative">
+                                    <button
+                                        @click="toggleDropdown"
+                                        class="text-xs h-7 bg-[#FFD700] text-[#800000] hover:bg-[#B8860B] hover:text-white px-2 py-0.5 rounded flex items-center"
+                                    >
+                                        Download
+                                        <span class="ml-1">▼</span>
+                                    </button>
+                                    <div
+                                        v-if="showDownload"
+                                        class="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg text-sm"
+                                    >
+                                        <button @click="download('CSV')" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100">Download CSV</button>
+                                        <button @click="download('Excel')" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100">Download Excel</button>
+                                        <button @click="download('PDF')" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100">Download PDF</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <div class="flex flex-wrap gap-1">
+                                    <button
+                                        v-for="option in filters"
+                                        :key="option.value"
+                                        @click="setFilter(option.value)"
+                                        class="px-1.5 py-0.5 text-xs rounded"
+                                        :class="activeFilter === option.value
+                ? 'bg-[#FFD700] text-[#800000] font-semibold'
+                : 'bg-[#FFD700]/20 text-[#B8860B]'"
+                                    >
+                                        {{ option.label }}
+                                    </button>
+                                </div>
+
+                                <!-- Program dropdown -->
+                                <select
+                                    v-model="selectedVisitProgram"
+                                    class="text-xs ml-auto border border-[#FFD700] rounded px-2 py-0.5 focus:ring-1 focus:ring-[#FFD700] outline-none"
+                                >
+                                    <option value="all">All Programs</option>
+                                    <option value="BSIT">BSIT</option>
+                                    <option value="BSABE">BSABE</option>
+                                    <option value="BSNED">BSNED</option>
+                                    <option value="BSED">BSED</option>
+                                </select>
+                            </div>
+
+                            <!-- Show only if "custom" selected -->
+                            <div v-if="activeFilter === 'custom'" class="flex gap-2 mt-2 items-center">
+                                <input type="date" class="flex-1 text-xs border border-[#FFD700] rounded px-2 py-0.5 focus:ring-1 focus:ring-[#FFD700] outline-none" />
+                                <span class="text-xs text-[#B8860B]">to</span>
+                                <input type="date" class="flex-1 text-xs border border-[#FFD700] rounded px-2 py-0.5 focus:ring-1 focus:ring-[#FFD700] outline-none" />
+                            </div>
                         </div>
                     </div>
-                    <div class="flex gap-2">
-                        <Button variant="outline" @click="showDialogCreate">
-                            <Plus class="h-4"></Plus>
-                            Create New
-                        </Button>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger as-child>
-                                <Button variant="outline" class="ml-auto">
-                                    Columns
-                                    <ChevronDown class="ml-2 h-4 w-4" />
+                </div>
+                <!-- End Visits Card Section -->
+
+                <!-- Tabs Section -->
+                <div class="mb-6">
+                    <div class="border-b border-gray-200">
+                        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                            <button
+                                @click="activeTab = 'all-logs'"
+                                :class="[
+                          activeTab === 'all-logs'
+                            ? 'border-[#800000] text-[#800000]'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                          'whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'
+                        ]"
+                            >
+                                All Logs
+                            </button>
+                            <button
+                                @click="activeTab = 'logout-by-system'"
+                                :class="[
+                          activeTab === 'logout-by-system'
+                            ? 'border-[#800000] text-[#800000]'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                          'whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm'
+                        ]"
+                            >
+                                Logout by System
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+                <!-- End Tabs Section -->
+
+
+                <div v-if="activeTab === 'all-logs'">
+                    <div class="flex gap-2 items-center justify-between py-4">
+                        <div class="flex gap-2">
+                            <div class="relative">
+                                <Input
+                                    class="w-[320px] pr-8"
+                                    placeholder="Search by ID or Client..."
+                                    v-model="filterInput"
+                                    @keyup.enter="applyFilter"
+                                    @blur="applyFilter"
+                                />
+                                <Button
+                                    v-if="filterInput"
+                                    variant="ghost"
+                                    class="absolute right-0 top-0 h-full px-2"
+                                    @click="clearFilter"
+                                >
+                                    <X class="h-4 w-4" />
                                 </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuCheckboxItem v-for="column in
+                            </div>
+                            <div v-for="filter in filter_toolbar" :key="filter.title">
+                                <Filter :column="table.getColumn(filter.column)" :title="filter.title" :options="filter.data"></Filter>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <Button variant="outline" @click="showDialogCreate">
+                                <Plus class="h-4"></Plus>
+                                Create New
+                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger as-child>
+                                    <Button variant="outline" class="ml-auto">
+                                        Columns
+                                        <ChevronDown class="ml-2 h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuCheckboxItem v-for="column in
                                 table.getAllColumns().filter((column) => column.getCanHide())"
-                                                          :key="column.id" class="capitalize"
-                                                          :checked="column.getIsVisible()"
-                                                          @update:checked="(value: boolean | 'indeterminate') => {
+                                                              :key="column.id" class="capitalize"
+                                                              :checked="column.getIsVisible()"
+                                                              @update:checked="(value: boolean | 'indeterminate') => {
                                                           column.toggleVisibility(!!value)
                                                         }">
-                                    {{ column.id }}
-                                </DropdownMenuCheckboxItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                </div>
-                <div class="rounded-md border">
-                    <Table class="w-full">
-                        <TableHeader>
-                            <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
-                                <TableHead v-for="header in headerGroup.headers" :key="header.id">
-                                    <FlexRender v-if="!header.isPlaceholder" :render="header.column.columnDef.header" :props="header.getContext()" />
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <template v-if="table.getRowModel().rows?.length">
-                                <template v-for="row in table.getRowModel().rows" :key="row.id">
-                                    <TableRow :data-state="row.getIsSelected() && 'selected'">
-                                        <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
-                                            <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow v-if="row.getIsExpanded()">
-                                        <TableCell :colspan="row.getAllCells().length">
-                                            {{ JSON.stringify(row.original) }}
-                                        </TableCell>
-                                    </TableRow>
-                                </template>
-                            </template>
-                            <TableRow v-else>
-                                <TableCell :colspan="columns.length" class="h-24 text-center">
-                                    No results.
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </div>
-                <div class="flex items-center justify-end space-x-2 py-4">
-                    <div class="flex-1 text-sm text-muted-foreground">
-                        {{ table.getFilteredSelectedRowModel().rows.length }} of
-                        {{ table.getFilteredRowModel().rows.length }} row(s) selected.
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <p class="text-sm font-medium">Rows per page</p>
-                        <Select :model-value="table.getState().pagination.pageSize.toString()" @update:model-value="(value) => table.setPageSize(Number(value))">
-                            <SelectTrigger class="h-8 w-[70px]">
-                                <SelectValue :placeholder="table.getState().pagination.pageSize.toString()" />
-                            </SelectTrigger>
-                            <SelectContent side="top">
-                                <SelectItem v-for="pageSize in pageSizes" :key="pageSize" :value="pageSize.toString()">
-                                    {{ pageSize }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div class="space-x-2">
-                        <div class="flex items-center space-x-2">
-                            <Button variant="outline" class="hidden h-8 w-8 p-0 lg:flex" :disabled="!table.getCanPreviousPage()" @click="table.setPageIndex(0)">
-                                <DoubleArrowLeftIcon class="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" class="h-8 w-8 p-0" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
-                                <ChevronLeftIcon class="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" class="h-8 w-8 p-0" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
-                                <ChevronRightIcon class="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" class="hidden h-8 w-8 p-0 lg:flex" :disabled="!table.getCanNextPage()" @click="table.setPageIndex(table.getPageCount() - 1)">
-                                <DoubleArrowRightIcon class="h-4 w-4" />
-                            </Button>
+                                        {{ column.id }}
+                                    </DropdownMenuCheckboxItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
+                    </div>
+
+                    <div class="rounded-md border">
+                        <Table class="w-full">
+                            <TableHeader>
+                                <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
+                                    <TableHead v-for="header in headerGroup.headers" :key="header.id">
+                                        <FlexRender v-if="!header.isPlaceholder" :render="header.column.columnDef.header" :props="header.getContext()" />
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <template v-if="table.getRowModel().rows?.length">
+                                    <template v-for="row in table.getRowModel().rows" :key="row.id">
+                                        <TableRow :data-state="row.getIsSelected() && 'selected'">
+                                            <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
+                                                <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow v-if="row.getIsExpanded()">
+                                            <TableCell :colspan="row.getAllCells().length">
+                                                {{ JSON.stringify(row.original) }}
+                                            </TableCell>
+                                        </TableRow>
+                                    </template>
+                                </template>
+                                <TableRow v-else>
+                                    <TableCell :colspan="columns.length" class="h-24 text-center">
+                                        No results.
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    <div class="flex items-center justify-end space-x-2 py-4">
+                        <div class="flex-1 text-sm text-muted-foreground">
+                            {{ table.getFilteredSelectedRowModel().rows.length }} of
+                            {{ table.getFilteredRowModel().rows.length }} row(s) selected.
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <p class="text-sm font-medium">Rows per page</p>
+                            <Select :model-value="table.getState().pagination.pageSize.toString()" @update:model-value="(value) => table.setPageSize(Number(value))">
+                                <SelectTrigger class="h-8 w-[70px]">
+                                    <SelectValue :placeholder="table.getState().pagination.pageSize.toString()" />
+                                </SelectTrigger>
+                                <SelectContent side="top">
+                                    <SelectItem v-for="pageSize in pageSizes" :key="pageSize" :value="pageSize.toString()">
+                                        {{ pageSize }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div class="space-x-2">
+                            <div class="flex items-center space-x-2">
+                                <Button variant="outline" class="hidden h-8 w-8 p-0 lg:flex" :disabled="!table.getCanPreviousPage()" @click="table.setPageIndex(0)">
+                                    <DoubleArrowLeftIcon class="h-4 w-4" />
+                                </Button>
+                                <Button variant="outline" class="h-8 w-8 p-0" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
+                                    <ChevronLeftIcon class="h-4 w-4" />
+                                </Button>
+                                <Button variant="outline" class="h-8 w-8 p-0" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
+                                    <ChevronRightIcon class="h-4 w-4" />
+                                </Button>
+                                <Button variant="outline" class="hidden h-8 w-8 p-0 lg:flex" :disabled="!table.getCanNextPage()" @click="table.setPageIndex(table.getPageCount() - 1)">
+                                    <DoubleArrowRightIcon class="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else-if="activeTab === 'logout-by-system'">
+                    <!-- Logout by System Tab Content -->
+                    <div class="mb-4">
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg
+                                        class="h-5 w-5 text-yellow-400"
+                                        viewBox="0 0 20 20"
+                                        fill="currentColor"
+                                    >
+                                        <path
+                                            fill-rule="evenodd"
+                                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                            clip-rule="evenodd"
+                                        />
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <h3 class="text-sm font-medium text-yellow-800">
+                                        Library Hours: 8:00 AM - 8:00 PM
+                                    </h3>
+                                    <div class="mt-2 text-sm text-yellow-700">
+                                        <p>
+                                            Users who remain logged in after 8:00 PM will be automatically
+                                            logged out by the system and recorded as violations.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Static Table -->
+                    <div class="rounded-md border">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Student ID</th>
+                                <th class="px-3 py-2 text-left">Name</th>
+                                <th class="px-3 py-2 text-left">Course/Program</th>
+                                <th class="px-3 py-2 text-left">Logout Time</th>
+                                <th class="px-3 py-2 text-left">Violation</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr v-if="violations.length === 0">
+                                <td colspan="5" class="h-24 text-center text-gray-500">
+                                    No system logout violations found.
+                                </td>
+                            </tr>
+                            <tr v-for="(item, index) in violations" :key="index" class="border-t">
+                                <td class="px-3 py-2">{{ item.studentId }}</td>
+                                <td class="px-3 py-2">{{ item.name }}</td>
+                                <td class="px-3 py-2">{{ item.course }}</td>
+                                <td class="px-3 py-2">{{ item.logoutTime }}</td>
+                                <td class="px-3 py-2 text-red-600 font-semibold">
+                                    {{ item.violation }}
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
