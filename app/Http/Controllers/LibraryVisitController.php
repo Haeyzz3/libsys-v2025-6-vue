@@ -6,12 +6,14 @@ use App\Models\Course;
 use App\Models\LibraryVisit;
 use App\Models\User;
 use App\Models\VisitPurpose;
+use App\Models\LibrarySetting;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Mpdf\Mpdf; // mPDF for PDF generation
+use Illuminate\Support\Facades\DB;
 
 class LibraryVisitController extends Controller
 {
@@ -619,6 +621,126 @@ class LibraryVisitController extends Controller
         };
         return response()->streamDownload($callback, $filenameBase.'.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8'
+        ]);
+    }
+
+    public function systemLogoutViolations(Request $request): JsonResponse
+    {
+        $filter = $request->get('filter', 'day'); // day|week|month|custom
+        $from = $request->get('custom_from');
+        $to = $request->get('custom_to');
+        $program = $request->get('program', 'all');
+        $search = $request->get('search');
+        $perPage = (int) $request->get('per_page', 10);
+        $page = (int) $request->get('page', 1);
+
+        $now = Carbon::now();
+        switch ($filter) {
+            case 'week':
+                $start = $now->copy()->startOfWeek();
+                $end = $now->copy()->endOfWeek();
+                break;
+            case 'month':
+                $start = $now->copy()->startOfMonth();
+                $end = $now->copy()->endOfMonth();
+                break;
+            case 'custom':
+                if ($from && $to) {
+                    try {
+                        $start = Carbon::parse($from)->startOfDay();
+                        $end = Carbon::parse($to)->endOfDay();
+                    } catch (\Exception $e) {
+                        return response()->json(['success' => false, 'message' => 'Invalid custom date range'], 422);
+                    }
+                } else {
+                    return response()->json(['success' => false, 'message' => 'Custom range requires custom_from and custom_to'], 422);
+                }
+                break;
+            case 'day':
+            default:
+                $start = $now->copy()->startOfDay();
+                $end = $now->copy()->endOfDay();
+        }
+
+        $operating = LibrarySetting::getValue('operating_hours', []);
+
+        // Base query WITHOUT DB-specific time/dayname filtering (portable across SQLite/MySQL)
+        $base = LibraryVisit::query()
+            ->join('users', 'library_visits.user_id', '=', 'users.id')
+            ->leftJoin('undergraduate_students', 'undergraduate_students.user_id', '=', 'users.id')
+            ->leftJoin('graduate_students', 'graduate_students.user_id', '=', 'users.id')
+            ->leftJoin('courses', function($join) {
+                $join->on('courses.id', '=', 'undergraduate_students.course_id')
+                    ->orOn('courses.id', '=', 'graduate_students.course_id');
+            })
+            ->whereIn('users.user_type_id', [3,4])
+            ->whereNotNull('library_visits.exit_time')
+            ->whereBetween('library_visits.exit_time', [$start, $end]);
+
+        if ($program !== 'all') {
+            $base->where('courses.code', $program);
+        }
+        if ($search) {
+            $base->where(function($q) use ($search) {
+                $q->where('users.library_id', 'like', "%$search%")
+                    ->orWhere('users.first_name', 'like', "%$search%")
+                    ->orWhere('users.last_name', 'like', "%$search%");
+            });
+        }
+
+        $rows = $base->select([
+            'library_visits.id',
+            'users.library_id as student_id',
+            'users.first_name',
+            'users.last_name',
+            'courses.code as program_code',
+            'library_visits.exit_time as logout_time'
+        ])->orderBy('library_visits.exit_time')->get();
+
+        // In-PHP violation filtering (exit time strictly AFTER closing time for that day)
+        $violations = $rows->filter(function($r) use ($operating) {
+            if (!$r->logout_time) return false;
+            $logout = Carbon::parse($r->logout_time);
+            $dayKey = strtolower($logout->format('l'));
+            $hours = $operating[$dayKey] ?? null;
+            if (!$hours || empty($hours['close'])) return false;
+            $closing = Carbon::parse($logout->format('Y-m-d').' '.$hours['close'].':00');
+            return $logout->gt($closing);
+        })->values();
+
+        $total = $violations->count();
+        $paged = $violations->slice(($page - 1) * $perPage, $perPage)->values();
+
+        $data = $paged->map(function($r){
+            return [
+                'studentId' => $r->student_id,
+                'name' => trim(($r->first_name ?? '').' '.($r->last_name ?? '')),
+                'course' => $r->program_code ?? 'UNASSIGNED',
+                'logoutTime' => Carbon::parse($r->logout_time)->format('Y-m-d H:i'),
+                'violation' => 'Auto Logout After Hours'
+            ];
+        });
+
+        $todayKey = strtolower(Carbon::now()->format('l'));
+        $todayHours = $operating[$todayKey] ?? null;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'rows' => $data,
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'last_page' => $perPage ? (int) ceil($total / $perPage) : 1,
+                ],
+                'period' => [
+                    'filter' => $filter,
+                    'start' => $start->toDateTimeString(),
+                    'end' => $end->toDateTimeString(),
+                ],
+                'today_hours' => $todayHours,
+            ]
         ]);
     }
 }

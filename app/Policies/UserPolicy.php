@@ -12,12 +12,13 @@ class UserPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->UserType->key === 'super_admin';
+        return optional($user->userType)->key === 'super_admin';
     }
 
     public function login(User $user): bool
     {
-        return in_array($user->UserType->key, ['super_admin', 'library_staff']);
+        $key = optional($user->userType)->key;
+        return in_array($key, ['super_admin', 'library_staff']);
     }
 
     /**

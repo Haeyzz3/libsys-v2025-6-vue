@@ -6,7 +6,6 @@ use App\Http\Controllers\BorrowingTransactionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DigitalResourceController;
 use App\Http\Controllers\FacultyController;
-use App\Http\Controllers\GradSchoolStudentController;
 use App\Http\Controllers\GraduateStudentController;
 use App\Http\Controllers\LibraryVisitController;
 use App\Http\Controllers\PeriodicalController;
@@ -127,6 +126,8 @@ Route::middleware($middleware)->group(function () {
         Route::get('/', [LibraryVisitController::class, 'index'])->name('logger.index');
         Route::get('/api/visit-card-stats', [LibraryVisitController::class, 'visitCardStats'])->name('logger.api.visitCardStats');
         Route::get('/export', [LibraryVisitController::class, 'exportVisits'])->name('logger.exportVisits');
+        // System logout violations (new)
+        Route::get('/api/system-logout-violations', [LibraryVisitController::class, 'systemLogoutViolations'])->name('logger.api.systemLogoutViolations');
     });
 
     Route::get('/test', [TestController::class, 'index'])->name('test.index');

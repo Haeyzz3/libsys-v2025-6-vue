@@ -526,94 +526,92 @@ const visitTitle = visitsTitle; // alias for template compatibility
 // Tab state
 const activeTab = ref<'all-logs' | 'logout-by-system'>('all-logs');
 
-// Static demo data
-const violations = ref([
-    {
-        studentId: '2021001',
-        name: 'Juan Dela Cruz',
-        course: 'BSIT',
-        logoutTime: '8:45 PM',
-        violation: 'Auto Logout after hours',
-    },
-    {
-        studentId: '2021042',
-        name: 'Maria Santos',
-        course: 'BSABE',
-        logoutTime: '9:10 PM',
-        violation: 'Auto Logout after hours',
-    },
-    {
-        studentId: '2021089',
-        name: 'Pedro Reyes',
-        course: 'BSNED',
-        logoutTime: '8:30 PM',
-        violation: 'Auto Logout after hours',
-    },
-    {
-        studentId: '2021056',
-        name: 'Yahzee Jon',
-        course: 'BSED',
-        logoutTime: '8:21 PM',
-        violation: 'Auto Logout after hours',
-    },
-]);
+// System Logout Violations dynamic data
+const systemViolations = ref<any[]>([]);
+const systemLoading = ref(false);
+const systemError = ref<string|null>(null);
+const systemPage = ref(1);
+const systemPerPage = ref(10);
+const systemTotal = ref(0);
+const systemLastPage = ref(1);
+const systemSearch = ref('');
+const systemFetchedOnce = ref(false);
+const systemTodayHours = ref<{open:string;close:string}|null>(null);
+const systemPerPageOptions = [5,10,15,25,50];
+let systemSearchDebounce: any = null;
 
-function setFilter(filter: string) {
-    if (activeFilter.value === filter) return;
-    activeFilter.value = filter as any;
-    if (filter !== 'custom') {
-        customFrom.value = null;
-        customTo.value = null;
-    }
-}
-function toggleDropdown() {
-    showDownload.value = !showDownload.value;
-}
-function download(type: string) {
-    if (activeFilter.value === 'custom' && (!customFrom.value || !customTo.value)) {
-        // eslint-disable-next-line no-alert
-        alert('Please select both start and end dates for the custom range before downloading.');
-        return;
-    }
-    const params: Record<string, string> = {
-        type: type.toLowerCase(),
+function buildSystemParams(extra: Record<string, any> = {}) {
+    const params: Record<string, any> = {
+        page: systemPage.value,
+        per_page: systemPerPage.value,
         filter: activeFilter.value,
         program: selectedVisitProgram.value,
+        search: systemSearch.value || undefined,
     };
     if (activeFilter.value === 'custom' && customFrom.value && customTo.value) {
         params.custom_from = customFrom.value;
         params.custom_to = customTo.value;
     }
-
-    const url = route('logger.exportVisits');
-    statsLoading.value = true; // brief UI feedback (optional)
-    axios.get(url, { responseType: 'blob', params })
-        .then(response => {
-            const disposition = response.headers['content-disposition'];
-            let filename = 'visits.' + (type === 'excel' ? 'xlsx' : type.toLowerCase());
-            if (disposition) {
-                const match = /filename="?([^";]+)"?/i.exec(disposition);
-                if (match && match[1]) filename = match[1];
-            }
-            const blob = new Blob([response.data]);
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            URL.revokeObjectURL(link.href);
-            link.remove();
-        })
-        .catch(err => {
-            console.error('Download failed', err);
-            // eslint-disable-next-line no-alert
-            alert(err?.response?.data?.message || 'Download failed');
-        })
-        .finally(() => {
-            statsLoading.value = false;
-            showDownload.value = false;
-        });
+    return { ...params, ...extra };
 }
+
+async function fetchSystemViolations(force = false) {
+    if (activeTab.value !== 'logout-by-system') return;
+    if (!force && activeFilter.value === 'custom' && (!customFrom.value || !customTo.value)) {
+        return; // wait until both dates set
+    }
+    systemLoading.value = true;
+    systemError.value = null;
+    try {
+        const { data } = await axios.get(route('logger.api.systemLogoutViolations'), { params: buildSystemParams() });
+        if (data.success) {
+            systemViolations.value = data.data.rows;
+            systemPage.value = data.data.pagination.current_page;
+            systemPerPage.value = data.data.pagination.per_page;
+            systemTotal.value = data.data.pagination.total;
+            systemLastPage.value = data.data.pagination.last_page;
+            systemTodayHours.value = data.data.today_hours || null;
+            systemFetchedOnce.value = true;
+        } else {
+            systemError.value = 'Failed to load system logout violations';
+        }
+    } catch (e: any) {
+        systemError.value = e?.response?.data?.message || e.message || 'Error loading violations';
+    } finally {
+        systemLoading.value = false;
+    }
+}
+
+function systemGoToPage(p: number) {
+    if (p < 1 || p > systemLastPage.value) return;
+    systemPage.value = p;
+    fetchSystemViolations(true);
+}
+function systemChangePerPage(size: number) {
+    systemPerPage.value = size;
+    systemPage.value = 1;
+    fetchSystemViolations(true);
+}
+function onSystemSearchInput() {
+    clearTimeout(systemSearchDebounce);
+    systemSearchDebounce = setTimeout(() => {
+        systemPage.value = 1;
+        fetchSystemViolations(true);
+    }, 400);
+}
+
+watch(activeTab, (val) => {
+    if (val === 'logout-by-system' && !systemFetchedOnce.value) {
+        fetchSystemViolations(true);
+    }
+});
+watch([activeFilter, customFrom, customTo, selectedVisitProgram], () => {
+    if (activeTab.value === 'logout-by-system') {
+        systemPage.value = 1;
+        fetchSystemViolations(true);
+    }
+});
+
 </script>
 
 <template>
@@ -874,32 +872,60 @@ function download(type: string) {
                 <!-- Logout by System Tab Content -->
                 <div v-else-if="activeTab === 'logout-by-system'">
                     <div class="mb-4">
-                        <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                        <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 relative">
+                            <div v-if="systemLoading && !systemFetchedOnce" class="absolute inset-0 flex items-center justify-center bg-white/60 text-xs font-medium">Loading...</div>
                             <div class="flex">
                                 <div class="flex-shrink-0">
                                     <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                                        <path
-                                            fill-rule="evenodd"
-                                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                            clip-rule="evenodd"
-                                        />
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                                     </svg>
                                 </div>
-                                <div class="ml-3">
-                                    <h3 class="text-sm font-medium text-yellow-800">Library Hours: 8:00 AM - 8:00 PM</h3>
+                                <div class="ml-3 w-full">
+                                    <h3 class="text-sm font-medium text-yellow-800">
+                                        Library Hours
+                                        <span v-if="systemTodayHours" class="font-semibold">: {{ systemTodayHours.open }} - {{ systemTodayHours.close }}</span>
+                                        <span v-else>: (Unavailable)</span>
+                                    </h3>
                                     <div class="mt-2 text-sm text-yellow-700">
                                         <p>
-                                            Users who remain logged in after 8:00 PM will be automatically logged out by the system and recorded as
-                                            violations.
+                                            Users who remain logged in past closing time are flagged as automatic logout violations.
                                         </p>
+                                    </div>
+                                    <div class="mt-3 flex flex-wrap gap-2 items-center">
+                                        <div class="relative">
+                                            <input
+                                                type="text"
+                                                v-model="systemSearch"
+                                                @input="onSystemSearchInput"
+                                                placeholder="Search ID / Name"
+                                                class="rounded border border-yellow-300 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-yellow-500"
+                                            />
+                                            <button v-if="systemSearch" @click="systemSearch=''; onSystemSearchInput();" class="absolute right-1 top-1 text-xs text-gray-500">×</button>
+                                        </div>
+                                        <select
+                                            v-model.number="systemPerPage"
+                                            @change="systemChangePerPage(Number(systemPerPage))"
+                                            class="rounded border border-yellow-300 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-yellow-500"
+                                        >
+                                            <option v-for="n in systemPerPageOptions" :key="n" :value="n">{{ n }} / page</option>
+                                        </select>
+                                        <div class="flex gap-1 items-center text-xs font-medium">
+                                            <button class="px-2 py-1 rounded border" :disabled="systemPage===1 || systemLoading" @click="systemGoToPage(1)">«</button>
+                                            <button class="px-2 py-1 rounded border" :disabled="systemPage===1 || systemLoading" @click="systemGoToPage(systemPage-1)">‹</button>
+                                            <span>Page {{ systemPage }} / {{ systemLastPage }}</span>
+                                            <button class="px-2 py-1 rounded border" :disabled="systemPage===systemLastPage || systemLoading" @click="systemGoToPage(systemPage+1)">›</button>
+                                            <button class="px-2 py-1 rounded border" :disabled="systemPage===systemLastPage || systemLoading" @click="systemGoToPage(systemLastPage)">»</button>
+                                        </div>
+                                        <div class="ml-auto text-xs text-yellow-700" v-if="systemTotal">Total: {{ systemTotal }}</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Static Table -->
-                    <div class="rounded-md border">
+                    <!-- Dynamic Table -->
+                    <div class="rounded-md border relative">
+                        <div v-if="systemLoading" class="absolute inset-0 flex items-center justify-center bg-white/60 text-sm">Loading...</div>
                         <table class="w-full text-sm">
                             <thead class="bg-gray-100">
                                 <tr>
@@ -911,17 +937,18 @@ function download(type: string) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-if="violations.length === 0">
+                                <tr v-if="systemError && !systemLoading">
+                                    <td colspan="5" class="h-24 text-center text-red-600">{{ systemError }}</td>
+                                </tr>
+                                <tr v-else-if="!systemLoading && systemViolations.length === 0">
                                     <td colspan="5" class="h-24 text-center text-gray-500">No system logout violations found.</td>
                                 </tr>
-                                <tr v-for="(item, index) in violations" :key="index" class="border-t">
+                                <tr v-for="(item, index) in systemViolations" :key="index" class="border-t">
                                     <td class="px-3 py-2">{{ item.studentId }}</td>
                                     <td class="px-3 py-2">{{ item.name }}</td>
                                     <td class="px-3 py-2">{{ item.course }}</td>
                                     <td class="px-3 py-2">{{ item.logoutTime }}</td>
-                                    <td class="px-3 py-2 font-semibold text-red-600">
-                                        {{ item.violation }}
-                                    </td>
+                                    <td class="px-3 py-2 font-semibold text-red-600">{{ item.violation }}</td>
                                 </tr>
                             </tbody>
                         </table>
