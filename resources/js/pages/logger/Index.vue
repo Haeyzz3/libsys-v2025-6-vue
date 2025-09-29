@@ -483,10 +483,8 @@ function setFilter(filter: string) {
 // Initial load
 fetchVisitCardStats();
 
-// Refresh when filter changes
-watch(activeFilter, () => {
-    fetchVisitCardStats();
-});
+// Remove redundant activeFilter watcher (setFilter handles non-custom fetches)
+// Custom range watcher remains to trigger fetch only after both dates selected
 watch([customFrom, customTo], () => {
     if (activeFilter.value === 'custom' && customFrom.value && customTo.value) {
         fetchVisitCardStats();
