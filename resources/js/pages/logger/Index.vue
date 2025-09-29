@@ -399,6 +399,42 @@ const showDialogCreate = () => {
     showDialog.value = true;
 };
 
+// Dropdown + download handlers (Visits Card Section)
+function toggleDropdown() {
+    showDownload.value = !showDownload.value;
+}
+
+function download(format: string) {
+    if (!format) return;
+    const type = format.toLowerCase(); // expected by backend: csv|excel|pdf
+
+    // Validate custom range if selected
+    if (activeFilter.value === 'custom') {
+        if (!customFrom.value || !customTo.value) {
+            // Basic inline feedback; replace with toast system if available
+            alert('Please select both start and end dates for the custom range before downloading.');
+            return;
+        }
+    }
+
+    const params = new URLSearchParams();
+    params.set('type', ['csv','excel','pdf'].includes(type) ? type : 'csv');
+    params.set('filter', activeFilter.value);
+    if (activeFilter.value === 'custom') {
+        params.set('custom_from', customFrom.value as string);
+        params.set('custom_to', customTo.value as string);
+    }
+    // Program filter (use the visit program selector tied to the visits count)
+    if (selectedVisitProgram.value) {
+        params.set('program', selectedVisitProgram.value);
+    }
+
+    const url = route('logger.exportVisits') + '?' + params.toString();
+    // Open in new tab to allow file download without interfering with current state
+    window.open(url, '_blank');
+    showDownload.value = false;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Logger',
