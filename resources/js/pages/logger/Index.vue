@@ -466,6 +466,20 @@ async function fetchVisitCardStats() {
     }
 }
 
+// Added back: filter change handler (was removed inadvertently)
+function setFilter(filter: string) {
+    if (activeFilter.value === filter) return;
+    activeFilter.value = filter as any;
+    if (filter !== 'custom') {
+        customFrom.value = null;
+        customTo.value = null;
+        fetchVisitCardStats();
+    } else {
+        // Clear current period until both dates set
+        period.value = null;
+    }
+}
+
 // Initial load
 fetchVisitCardStats();
 
