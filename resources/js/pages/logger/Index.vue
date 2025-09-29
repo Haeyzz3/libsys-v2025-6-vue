@@ -20,10 +20,11 @@ import {
 } from '@tanstack/vue-table';
 import { ArrowUpDown, ChevronDown, ListFilter, Plus, X } from 'lucide-vue-next';
 import { h, ref, computed, watch } from 'vue';
+import { format, parseISO } from 'date-fns';
 import { route } from 'ziggy-js';
 import DropdownAction from './DataTableDemoColumn.vue';
 import axios from 'axios';
-import type { Column, ColumnDef, Row, SortingState, Table } from '@tanstack/vue-table';
+import type { Column, ColumnDef, Row, SortingState, Table, ColumnFiltersState } from '@tanstack/vue-table';
 
 interface Props {
     data?: {
@@ -407,7 +408,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 // Dropdown + filters
 const showDownload = ref(false);
-const activeFilter = ref('day');
+const activeFilter = ref<'day' | 'week' | 'month' | 'custom'>('day');
+// Custom date range
+const customFrom = ref<string | null>(null);
+const customTo = ref<string | null>(null);
 
 // Program selections
 const selectedVisitProgram = ref('all');
@@ -428,28 +432,30 @@ const filters = [
     { label: 'Custom', value: 'custom' },
 ];
 
+const period = ref<{ filter: string; start: string; end: string } | null>(null);
+
 async function fetchVisitCardStats() {
     statsLoading.value = true;
     statsError.value = null;
     try {
         const params: any = { filter: activeFilter.value };
         if (activeFilter.value === 'custom') {
-            // TODO: wire date pickers; currently placeholder
-            // params.custom_from = customFrom.value; params.custom_to = customTo.value;
+            if (!customFrom.value || !customTo.value) {
+                statsLoading.value = false; // wait for both dates
+                return;
+            }
+            params.custom_from = customFrom.value;
+            params.custom_to = customTo.value;
         }
         const { data } = await axios.get(route('logger.api.visitCardStats'), { params });
         if (data.success) {
             visitPrograms.value = data.data.programs;
             currentlyInLibraryMap.value = data.data.currently_in_library;
             visitsMap.value = data.data.visits;
-            // Ensure selected programs still exist
-            const codes = visitPrograms.value.map(p => p.code);
-            if (selectedVisitProgram.value !== 'all' && !codes.includes(selectedVisitProgram.value)) {
-                selectedVisitProgram.value = 'all';
-            }
-            if (selectedLibraryProgram.value !== 'all' && !codes.includes(selectedLibraryProgram.value)) {
-                selectedLibraryProgram.value = 'all';
-            }
+            period.value = data.data.period;
+            const codes = visitPrograms.value.map((p) => p.code);
+            if (selectedVisitProgram.value !== 'all' && !codes.includes(selectedVisitProgram.value)) selectedVisitProgram.value = 'all';
+            if (selectedLibraryProgram.value !== 'all' && !codes.includes(selectedLibraryProgram.value)) selectedLibraryProgram.value = 'all';
         } else {
             statsError.value = 'Failed to load visit statistics';
         }
@@ -466,6 +472,11 @@ fetchVisitCardStats();
 // Refresh when filter changes
 watch(activeFilter, () => {
     fetchVisitCardStats();
+});
+watch([customFrom, customTo], () => {
+    if (activeFilter.value === 'custom' && customFrom.value && customTo.value) {
+        fetchVisitCardStats();
+    }
 });
 
 // Computed for "Currently in Library" (dynamic)
@@ -484,15 +495,33 @@ const visitCount = computed(() => {
     return visitsMap.value[selectedVisitProgram.value] ?? 0;
 });
 
-const visitTitle = computed(() => {
-    const filterLabel = activeFilter.value === 'day' ? 'Today' : activeFilter.value.charAt(0).toUpperCase() + activeFilter.value.slice(1);
-
-    if (selectedVisitProgram.value === 'all') {
-        return activeFilter.value === 'day' ? 'Visits Today' : `Visits (${filterLabel})`;
-    } else {
-        return activeFilter.value === 'day' ? `${selectedVisitProgram.value} Visits` : `${selectedVisitProgram.value} Visits (${filterLabel})`;
+const visitsTitle = computed(() => {
+    const baseProgram = selectedVisitProgram.value === 'all' ? 'Visits' : `${selectedVisitProgram.value} Visits`;
+    if (activeFilter.value === 'day') {
+        return selectedVisitProgram.value === 'all' ? 'Visits Today' : `${selectedVisitProgram.value} Visits`;
     }
+    if (activeFilter.value === 'custom') {
+        if (customFrom.value && customTo.value) {
+            return `${baseProgram} (${customFrom.value} → ${customTo.value})`;
+        }
+        return `${baseProgram} (Custom Range)`;
+    }
+    if (period.value && period.value.start && period.value.end) {
+        const start = parseISO(period.value.start);
+        const end = parseISO(period.value.end);
+        const sameMonth = start.getMonth() === end.getMonth();
+        const sameYear = start.getFullYear() === end.getFullYear();
+        let rangeLabel = '';
+        if (sameMonth && sameYear) rangeLabel = `${format(start, 'MMM d')}–${format(end, 'd')}`;
+        else if (sameYear) rangeLabel = `${format(start, 'MMM d')}–${format(end, 'MMM d')}`;
+        else rangeLabel = `${format(start, 'MMM d, yyyy')}–${format(end, 'MMM d, yyyy')}`;
+        const filterLabel = activeFilter.value === 'week' ? 'Week' : 'Month';
+        return `${baseProgram} (${filterLabel}: ${rangeLabel})`;
+    }
+    const filterLabel = activeFilter.value.charAt(0).toUpperCase() + activeFilter.value.slice(1);
+    return `${baseProgram} (${filterLabel})`;
 });
+const visitTitle = visitsTitle; // alias for template compatibility
 
 // Tab state
 const activeTab = ref<'all-logs' | 'logout-by-system'>('all-logs');
@@ -528,6 +557,28 @@ const violations = ref([
         violation: 'Auto Logout after hours',
     },
 ]);
+
+function setFilter(filter: string) {
+    if (activeFilter.value === filter) return;
+    activeFilter.value = filter as any;
+    if (filter !== 'custom') {
+        customFrom.value = null;
+        customTo.value = null;
+    }
+}
+function toggleDropdown() {
+    showDownload.value = !showDownload.value;
+}
+function download(type: string) {
+    // Future: implement real export using backend with params
+    // eslint-disable-next-line no-console
+    console.log('Download requested', type, {
+        filter: activeFilter.value,
+        custom_from: customFrom.value,
+        custom_to: customTo.value,
+    });
+    showDownload.value = false;
+}
 </script>
 
 <template>
@@ -608,9 +659,9 @@ const violations = ref([
                                 </select>
                             </div>
                             <div v-if="activeFilter === 'custom'" class="mt-2 flex items-center gap-2">
-                                <input type="date" class="flex-1 rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]" />
+                                <input type="date" v-model="customFrom" class="flex-1 rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]" />
                                 <span class="text-xs text-[#B8860B]">to</span>
-                                <input type="date" class="flex-1 rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]" />
+                                <input type="date" v-model="customTo" :min="customFrom || undefined" class="flex-1 rounded border border-[#FFD700] px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#FFD700]" />
                             </div>
                             <p v-if="statsError" class="mt-1 text-center text-[10px] text-red-600">{{ statsError }}</p>
                         </div>

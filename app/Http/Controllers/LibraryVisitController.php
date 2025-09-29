@@ -173,7 +173,6 @@ class LibraryVisitController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
-
     }
 
     public function searchById(Request $request): JsonResponse
