@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Mpdf\Mpdf; // mPDF for PDF generation
 
 class LibraryVisitController extends Controller
 {
@@ -496,6 +497,128 @@ class LibraryVisitController extends Controller
                     'end' => $end->toDateTimeString(),
                 ],
             ],
+        ]);
+    }
+
+    public function exportVisits(Request $request)
+    {
+        $type = strtolower($request->get('type', 'csv')); // csv|excel|pdf
+        $filter = $request->get('filter', 'day'); // day|week|month|custom
+        $from = $request->get('custom_from');
+        $to = $request->get('custom_to');
+        $program = $request->get('program', 'all');
+
+        $now = Carbon::now();
+        switch ($filter) {
+            case 'week':
+                $start = $now->copy()->startOfWeek();
+                $end = $now->copy()->endOfWeek();
+                break;
+            case 'month':
+                $start = $now->copy()->startOfMonth();
+                $end = $now->copy()->endOfMonth();
+                break;
+            case 'custom':
+                if ($from && $to) {
+                    try {
+                        $start = Carbon::parse($from)->startOfDay();
+                        $end = Carbon::parse($to)->endOfDay();
+                    } catch (\Exception $e) {
+                        return response()->json(['message' => 'Invalid custom date range'], 422);
+                    }
+                } else {
+                    return response()->json(['message' => 'Custom range requires custom_from and custom_to'], 422);
+                }
+                break;
+            case 'day':
+            default:
+                $start = $now->copy()->startOfDay();
+                $end = $now->copy()->endOfDay();
+        }
+
+        $query = LibraryVisit::query()
+            ->join('users', 'library_visits.user_id', '=', 'users.id')
+            ->leftJoin('undergraduate_students', 'undergraduate_students.user_id', '=', 'users.id')
+            ->leftJoin('graduate_students', 'graduate_students.user_id', '=', 'users.id')
+            ->leftJoin('courses', function($join) {
+                $join->on('courses.id', '=', 'undergraduate_students.course_id')
+                    ->orOn('courses.id', '=', 'graduate_students.course_id');
+            })
+            ->whereIn('users.user_type_id', [3,4])
+            ->whereBetween('library_visits.entry_time', [$start, $end]);
+
+        if ($program !== 'all') {
+            $query->where('courses.code', $program);
+        }
+
+        $rows = $query->select([
+            'library_visits.id',
+            'users.first_name',
+            'users.last_name',
+            'courses.code as program_code',
+            'library_visits.entry_time',
+            'library_visits.exit_time'
+        ])->orderBy('library_visits.entry_time')->get();
+
+        $filenameBase = 'library_visits_'.$filter.'_'.$start->format('Ymd').'-'.$end->format('Ymd');
+
+        if ($type === 'pdf') {
+            $html = view('exports.visits', [
+                'rows' => $rows,
+                'start' => $start,
+                'end' => $end,
+                'filter' => $filter,
+                'program' => $program,
+            ])->render();
+            $mpdf = new Mpdf();
+            $mpdf->WriteHTML($html);
+            return response($mpdf->Output($filenameBase.'.pdf', 'S'), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="'.$filenameBase.'.pdf"'
+            ]);
+        }
+
+        if ($type === 'excel' || $type === 'xls' || $type === 'xlsx') {
+            // Provide simple HTML table which Excel can open.
+            $html = '<table><thead><tr>';
+            $headers = ['ID','First Name','Last Name','Program Code','Entry Time','Exit Time'];
+            foreach ($headers as $h) { $html .= '<th>'.e($h).'</th>'; }
+            $html .= '</tr></thead><tbody>';
+            foreach ($rows as $r) {
+                $html .= '<tr>';
+                $html .= '<td>'.e($r->id).'</td>';
+                $html .= '<td>'.e($r->first_name).'</td>';
+                $html .= '<td>'.e($r->last_name).'</td>';
+                $html .= '<td>'.e($r->program_code ?? 'UNASSIGNED').'</td>';
+                $html .= '<td>'.e($r->entry_time).'</td>';
+                $html .= '<td>'.e($r->exit_time ?? '').'</td>';
+                $html .= '</tr>';
+            }
+            $html .= '</tbody></table>';
+            return response($html, 200, [
+                'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="'.$filenameBase.'.xls"'
+            ]);
+        }
+
+        // Default CSV
+        $callback = function() use ($rows) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['ID','First Name','Last Name','Program Code','Entry Time','Exit Time']);
+            foreach ($rows as $r) {
+                fputcsv($out, [
+                    $r->id,
+                    $r->first_name,
+                    $r->last_name,
+                    $r->program_code ?? 'UNASSIGNED',
+                    $r->entry_time,
+                    $r->exit_time,
+                ]);
+            }
+            fclose($out);
+        };
+        return response()->streamDownload($callback, $filenameBase.'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8'
         ]);
     }
 }

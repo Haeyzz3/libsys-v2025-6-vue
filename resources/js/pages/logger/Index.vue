@@ -570,14 +570,49 @@ function toggleDropdown() {
     showDownload.value = !showDownload.value;
 }
 function download(type: string) {
-    // Future: implement real export using backend with params
-    // eslint-disable-next-line no-console
-    console.log('Download requested', type, {
+    if (activeFilter.value === 'custom' && (!customFrom.value || !customTo.value)) {
+        // eslint-disable-next-line no-alert
+        alert('Please select both start and end dates for the custom range before downloading.');
+        return;
+    }
+    const params: Record<string, string> = {
+        type: type.toLowerCase(),
         filter: activeFilter.value,
-        custom_from: customFrom.value,
-        custom_to: customTo.value,
-    });
-    showDownload.value = false;
+        program: selectedVisitProgram.value,
+    };
+    if (activeFilter.value === 'custom' && customFrom.value && customTo.value) {
+        params.custom_from = customFrom.value;
+        params.custom_to = customTo.value;
+    }
+
+    const url = route('logger.exportVisits');
+    statsLoading.value = true; // brief UI feedback (optional)
+    axios.get(url, { responseType: 'blob', params })
+        .then(response => {
+            const disposition = response.headers['content-disposition'];
+            let filename = 'visits.' + (type === 'excel' ? 'xlsx' : type.toLowerCase());
+            if (disposition) {
+                const match = /filename="?([^";]+)"?/i.exec(disposition);
+                if (match && match[1]) filename = match[1];
+            }
+            const blob = new Blob([response.data]);
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            URL.revokeObjectURL(link.href);
+            link.remove();
+        })
+        .catch(err => {
+            console.error('Download failed', err);
+            // eslint-disable-next-line no-alert
+            alert(err?.response?.data?.message || 'Download failed');
+        })
+        .finally(() => {
+            statsLoading.value = false;
+            showDownload.value = false;
+        });
 }
 </script>
 

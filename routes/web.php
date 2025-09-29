@@ -126,6 +126,7 @@ Route::middleware($middleware)->group(function () {
         Route::prefix('logger')->group(function () {
         Route::get('/', [LibraryVisitController::class, 'index'])->name('logger.index');
         Route::get('/api/visit-card-stats', [LibraryVisitController::class, 'visitCardStats'])->name('logger.api.visitCardStats');
+        Route::get('/export', [LibraryVisitController::class, 'exportVisits'])->name('logger.exportVisits');
     });
 
     Route::get('/test', [TestController::class, 'index'])->name('test.index');
