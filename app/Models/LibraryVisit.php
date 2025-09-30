@@ -8,6 +8,12 @@ class LibraryVisit extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'auto_logged_out' => 'boolean',
+        'entry_time' => 'datetime',
+        'exit_time' => 'datetime',
+    ];
+
     public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class);

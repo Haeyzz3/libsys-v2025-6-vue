@@ -151,7 +151,7 @@ const columns: ColumnDef<RowData>[] = [
                 () => ['Entry Time', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
             );
         },
-        cell: ({ row }: { row: Row<RowData> }) => h('div', { class: 'max-w-48 whitespace-normal break-words' }, row.getValue('entry_time')),
+        cell: ({ row }: { row: Row<RowData> }) => h('div', { class: 'max-w-48 whitespace-normal break-words' }, formatTimestamp(row.getValue('entry_time'))),
         enableHiding: false,
     },
     {
@@ -175,7 +175,21 @@ const columns: ColumnDef<RowData>[] = [
                 () => ['Exit Time', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
             );
         },
-        cell: ({ row }: { row: Row<RowData> }) => h('div', { class: 'max-w-48 whitespace-normal break-words' }, row.getValue('exit_time')),
+        cell: ({ row }: { row: Row<RowData> }) => {
+            const raw = row.getValue('exit_time');
+            const display = formatTimestamp(raw);
+            const late = row.original.late_exit === true;
+            const classes = raw
+                ? late
+                    ? 'text-red-600 font-semibold'
+                    : 'text-green-600 font-medium'
+                : 'text-gray-400 italic';
+            return h(
+                'div',
+                { class: 'max-w-48 whitespace-normal break-words' },
+                [h('span', { class: classes }, display)]
+            );
+        },
         enableHiding: false,
     },
     {
@@ -659,6 +673,22 @@ watch([activeFilter, customFrom, customTo, selectedVisitProgram], () => {
         fetchSystemViolations(true);
     }
 });
+
+const formatTimestamp = (value: any) => {
+    if (!value) return '—';
+    try {
+        // Attempt ISO parse; fallback to string cleanup
+        const d = parseISO(String(value));
+        if (isNaN(d.getTime())) throw new Error('Invalid date');
+        return format(d, 'yyyy-MM-dd HH:mm:ss');
+    } catch {
+        // Remove T, microseconds, trailing Z as a graceful fallback
+        return String(value)
+            .replace('T', ' ')
+            .replace(/\.\d+Z$/, '')
+            .replace(/Z$/, '');
+    }
+};
 
 </script>
 

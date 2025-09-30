@@ -66,6 +66,25 @@ class LibraryVisitController extends Controller
             })
             ->paginate(perPage: $perPage);
 
+        // Inject late_exit flag based on operating hours closing time
+        $operating = LibrarySetting::getValue('operating_hours', []);
+        $visits->getCollection()->transform(function($visit) use ($operating) {
+            $visit->late_exit = false;
+            if ($visit->exit_time) {
+                try {
+                    $exit = Carbon::parse($visit->exit_time);
+                    $dayKey = strtolower($exit->format('l'));
+                    $close = $operating[$dayKey]['close'] ?? '22:00';
+                    if (!preg_match('/^\d{1,2}:\d{2}$/', $close)) { $close = '22:00'; }
+                    $closing = Carbon::parse($exit->format('Y-m-d').' '.$close.':00');
+                    $visit->late_exit = $exit->gt($closing);
+                } catch (\Exception $e) {
+                    $visit->late_exit = false; // fallback silently
+                }
+            }
+            return $visit;
+        });
+
         // Fetch available purposes for the filter dropdown
         $availablePurposes = VisitPurpose::select('id', 'name')->get()->map(function ($purpose) {
             return [
@@ -664,7 +683,6 @@ class LibraryVisitController extends Controller
 
         $operating = LibrarySetting::getValue('operating_hours', []);
 
-        // Base query WITHOUT DB-specific time/dayname filtering (portable across SQLite/MySQL)
         $base = LibraryVisit::query()
             ->join('users', 'library_visits.user_id', '=', 'users.id')
             ->leftJoin('undergraduate_students', 'undergraduate_students.user_id', '=', 'users.id')
@@ -694,12 +712,15 @@ class LibraryVisitController extends Controller
             'users.first_name',
             'users.last_name',
             'courses.code as program_code',
-            'library_visits.exit_time as logout_time'
+            'library_visits.exit_time as logout_time',
+            'library_visits.auto_logged_out',
+            'library_visits.violation_type'
         ])->orderBy('library_visits.exit_time')->get();
 
-        // In-PHP violation filtering (exit time strictly AFTER closing time for that day)
+        // Filter only auto-logged-out violations (spec: students who forgot to logout and were auto-logged at closing) and ensure exit_time > closing
         $violations = $rows->filter(function($r) use ($operating) {
             if (!$r->logout_time) return false;
+            if (!($r->auto_logged_out || $r->violation_type === 'AUTO_AFTER_HOURS')) return false;
             $logout = Carbon::parse($r->logout_time);
             $dayKey = strtolower($logout->format('l'));
             $hours = $operating[$dayKey] ?? null;
@@ -717,7 +738,8 @@ class LibraryVisitController extends Controller
                 'name' => trim(($r->first_name ?? '').' '.($r->last_name ?? '')),
                 'course' => $r->program_code ?? 'UNASSIGNED',
                 'logoutTime' => Carbon::parse($r->logout_time)->format('Y-m-d H:i'),
-                'violation' => 'Auto Logout After Hours'
+                'violation' => 'Auto Logout After Hours',
+                'autoLoggedOut' => true,
             ];
         });
 
