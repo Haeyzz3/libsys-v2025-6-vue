@@ -9,10 +9,12 @@ class Kernel extends ConsoleKernel
 {
     protected function schedule(Schedule $schedule): void
     {
-        // Run auto logout shortly after closing time (22:00) daily
-        $schedule->command('library:auto-logout')->dailyAt('22:05');
-        // Redundant morning catch-up run in case machine was off at night
-        $schedule->command('library:auto-logout')->dailyAt('08:10');
+        // Runs at 07:00, 07:15, ..., 16:45, 17:00 daily
+        $schedule
+            ->command('library:auto-logout')
+            ->everyFifteenMinutes()
+            ->between('07:00', '17:00')
+            ->withoutOverlapping();
     }
 
     protected function commands(): void
