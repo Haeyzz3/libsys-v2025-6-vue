@@ -39,7 +39,12 @@ class UpdateStudentDataFromCsv extends Command
             return 1;
         }
 
-        $csvData = array_map('str_getcsv', file($csvPath));
+        // Read the file with UTF-8 encoding
+        $fileContents = file_get_contents($csvPath);
+        $fileContents = mb_convert_encoding($fileContents, 'UTF-8', 'auto');
+        $csvData = array_map('str_getcsv', explode("\n", $fileContents));
+
+        // $csvData = array_map('str_getcsv', file($csvPath));
         $header = array_shift($csvData); // Remove header
 
         // Pre-fetch user type ID to avoid querying in a loop
@@ -66,7 +71,8 @@ class UpdateStudentDataFromCsv extends Command
                 if (str_contains($firstNamePart, '.')) {
                     $lastSpacePos = strrpos($firstNamePart, ' ');
                     $firstName = trim(substr($firstNamePart, 0, $lastSpacePos));
-                    $middleInitial = trim(str_replace('.', '', substr($firstNamePart, $lastSpacePos)));
+                    $middleInitialPart = trim(str_replace('.', '', substr($firstNamePart, $lastSpacePos)));
+                    $middleInitial = substr($middleInitialPart, 0, 1); // Take only the first character
                 } else {
                     $firstName = trim($firstNamePart);
                 }
@@ -91,8 +97,9 @@ class UpdateStudentDataFromCsv extends Command
 
                 // 3. --- Find or Create User ---
                 $user = User::updateOrCreate(
-                    ['library_id' => $numericLibId], // Match user by library_id
+                    ['email' => $email], // Match user by email to prevent duplicates
                     [
+                        'library_id' => $numericLibId,
                         'first_name' => $firstName,
                         'last_name' => $lastName,
                         'middle_initial' => $middleInitial,
