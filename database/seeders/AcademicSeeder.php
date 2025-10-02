@@ -156,7 +156,7 @@ class AcademicSeeder extends Seeder
 
         $gsars->courses()->createMany([
             [
-                'code' => 'PhD Hort',
+                'code' => 'PhDH',
                 'name' => 'Doctor of Philosophy in Horticulture',
             ],
             [
@@ -174,6 +174,10 @@ class AcademicSeeder extends Seeder
             [
                 'code' => 'MSA',
                 'name' => 'Master of Science in Agriculture',
+            ],
+            [
+                'code' => 'MEXED',
+                'name' => 'Master of Extension Education',
             ],
         ]);
 
