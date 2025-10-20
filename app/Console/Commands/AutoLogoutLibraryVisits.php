@@ -13,7 +13,7 @@ class AutoLogoutLibraryVisits extends Command
     protected $signature = 'library:auto-logout '
         . '{--dry-run : Show what would be updated without persisting} '
         . '{--force : Also close today\'s still-open visits even if current time is before today\'s closing time} '
-        . '{--since-days=7 : Only consider visits whose entry date is within the past N days (inclusive)}';
+        . '{--since-days=20 : Only consider visits whose entry date is within the past N days (inclusive)}';
 
     protected $description = 'Auto set exit_time for still-open student visits (undergrad/grad) whose visit date is past closing (or today past closing / forced), marking them as auto logged out.';
 
@@ -34,9 +34,9 @@ class AutoLogoutLibraryVisits extends Command
         // Helper to get closing Carbon for a given date
         $getClosingForDate = function (Carbon $date) use ($operating): Carbon {
             $dayKey = strtolower($date->format('l')); // e.g. monday
-            $closeStr = $operating[$dayKey]['close'] ?? '22:00';
+            $closeStr = $operating[$dayKey]['close'] ?? '18:00';
             if (!preg_match('/^\d{1,2}:\d{2}$/', $closeStr)) {
-                $closeStr = '22:00';
+                $closeStr = '18:00';
             }
             // Build full timestamp
             return Carbon::parse($date->format('Y-m-d') . ' ' . $closeStr . ':00');

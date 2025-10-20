@@ -9,12 +9,8 @@ class Kernel extends ConsoleKernel
 {
     protected function schedule(Schedule $schedule): void
     {
-        // Runs at 07:00, 07:15, ..., 16:45, 17:00 daily
-        $schedule
-            ->command('library:auto-logout')
-            ->everyFifteenMinutes()
-            ->between('07:00', '17:00')
-            ->withoutOverlapping();
+        // Scheduling is defined in routes/console.php using the Schedule facade.
+        // Intentionally left empty to avoid duplication.
     }
 
     protected function commands(): void
