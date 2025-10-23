@@ -165,6 +165,17 @@ class StudentDataUpdateSeeder extends Seeder
                     'user_type_id' => $userTypeId,
                 ];
 
+                // Check if a user with this email already exists (but different library_id)
+                $existingUserWithEmail = User::where('email', $email)
+                    ->where('library_id', '!=', $libraryId)
+                    ->first();
+
+                if ($existingUserWithEmail) {
+                    // If email exists for a different user, append library_id to make it unique
+                    $userData['email'] = $this->generateUniqueEmail($nameParts, $libraryId, $email);
+                    Log::info("Email conflict resolved for library_id {$libraryId}. Original: {$email}, New: {$userData['email']}");
+                }
+
                 $user = User::updateOrCreate(
                     ['library_id' => $libraryId], // Key to find user
                     $userData                     // Data to update or create
@@ -269,11 +280,17 @@ class StudentDataUpdateSeeder extends Seeder
         // "DELA CRUZ" -> "delacruz"
         $last = preg_replace('/\s+/u', '', $nameParts['last_name']);
 
-        // "2023-00151" -> "00151"
+        // Handle both formats: "202300151" (no hyphen) or "2023-00151" (with hyphen)
         $idPart = '';
-        $idParts = explode('-', $libraryId);
-        if (count($idParts) === 2) {
-            $idPart = $idParts[1];
+        if (strlen($libraryId) === 9) {
+            // Format: "202300151" -> extract last 5 digits: "00151"
+            $idPart = substr($libraryId, -5);
+        } else {
+            // Fallback: try to split by hyphen if it exists
+            $idParts = explode('-', $libraryId);
+            if (count($idParts) === 2) {
+                $idPart = $idParts[1];
+            }
         }
 
         $emailPrefix = $firstInitials . $middle . $last . $idPart;
@@ -283,13 +300,30 @@ class StudentDataUpdateSeeder extends Seeder
     }
 
     /**
-     * Parses the library_id string.
+     * Generates a unique email when there's a conflict.
+     */
+    private function generateUniqueEmail(array $nameParts, string $libraryId, string $originalEmail): string
+    {
+        // Extract the prefix from the original email (before @usep.edu.ph)
+        $emailPrefix = str_replace('@usep.edu.ph', '', $originalEmail);
+
+        // Add the full library_id to make it unique
+        $uniquePrefix = $emailPrefix . str_replace('-', '', $libraryId);
+
+        return mb_strtolower($uniquePrefix, 'UTF-8') . '@usep.edu.ph';
+    }
+
+    /**
+     * Parses the library_id string and removes hyphens for database storage.
      */
     private function parseLibraryId($value): ?string
     {
         if (empty($value) || !is_string($value)) return null;
-        if (preg_match('/^\d{4}-\d{5}$/', $value)) {
-            return $value;
+
+        // Accept both formats: "2023-00151" or "202300151"
+        if (preg_match('/^\d{4}-?\d{5}$/', $value)) {
+            // Remove any hyphens to store in database format (202300151)
+            return str_replace('-', '', $value);
         }
         return null;
     }
@@ -307,10 +341,21 @@ class StudentDataUpdateSeeder extends Seeder
      */
     private function parseSex($value): ?string
     {
-        if (!empty($value) && is_string($value)) {
-            $value = strtolower($value);
-            return $value === 'female' ? 'f' : ($value === 'male' ? 'm' : null);
+        if (empty($value) || !is_string($value)) {
+            return null;
         }
+
+        $value = strtolower(trim($value));
+
+        // Handle various formats
+        if (in_array($value, ['female', 'f'])) {
+            return 'f';
+        } elseif (in_array($value, ['male', 'm'])) {
+            return 'm';
+        }
+
+        // Log unrecognized values for debugging
+        Log::warning("Unrecognized sex value: '{$value}'");
         return null;
     }
 
