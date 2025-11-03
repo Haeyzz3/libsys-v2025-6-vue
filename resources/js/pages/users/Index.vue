@@ -510,6 +510,59 @@ watch(() => window.location.search, () => {
     initializeFromURL();
     fetchData();
 });
+
+// Add this import for the toggle button icon
+import { EyeOff } from 'lucide-vue-next';
+
+// Add this import for the data
+import { useUserStatistics } from '@/composables/useUserStatistics';
+
+// Make sure your 'vue' import includes all of these
+// (it already does in your example)
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
+
+// --- Add all of the following blocks of code ---
+
+// Carousel cards functionality
+const showStudentCard = ref(true)
+const showStaffCard = ref(true)
+const showFacultyCard = ref(true)
+const showGradSchoolCard = ref(true)
+const showCarousel = ref(true)
+
+// Use the composable to get real user statistics
+const { statistics, loading} = useUserStatistics()
+
+// Computed counts using real data from the backend
+const studentCount = computed(() => statistics.value.students)
+const staffCount = computed(() => statistics.value.staff)
+const facultyCount = computed(() => statistics.value.faculty)
+const graduateSchoolCount = computed(() => statistics.value.graduate_school)
+
+// Carousel dynamic width logic
+const cardSetRef = ref<HTMLElement | null>(null)
+const loopCardsRef = ref<HTMLElement | null>(null)
+const animationDistance = ref(0)
+
+function updateAnimationDistance() {
+    nextTick(() => {
+        if (cardSetRef.value && loopCardsRef.value) {
+            const width = cardSetRef.value.offsetWidth
+            animationDistance.value = width
+            loopCardsRef.value.style.setProperty('--cards-loop-distance', width + 'px')
+        }
+    })
+}
+
+onMounted(() => {
+    updateAnimationDistance()
+})
+
+watch([
+    showStudentCard, showStaffCard, showFacultyCard, showGradSchoolCard
+], () => {
+    updateAnimationDistance()
+})
 </script>
 
 <template>
@@ -525,6 +578,102 @@ watch(() => window.location.search, () => {
                     <Button variant="outline" size="sm" @click="fetchData" class="mt-2">
                         Retry
                     </Button>
+                </div>
+
+                <div class="flex justify-end mb-2">
+                    <button
+                        @click="showCarousel = !showCarousel"
+                        class="px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1"
+                        :class="showCarousel ? 'bg-[#800000] text-white' : 'bg-[#FFD700] text-[#800000]'"
+                    >
+                        <EyeOff v-if="!showCarousel" class="h-4 w-4" />
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        {{ showCarousel ? 'Hide Cards' : 'Show Cards' }}
+                    </button>
+                </div>
+
+                <div v-if="showCarousel" class="relative w-full overflow-x-hidden flex items-center mb-6" style="min-height: 100px;">
+                    <div ref="loopCardsRef" class="loop-cards flex flex-row flex-nowrap gap-4 animate-cards-loop items-center" style="will-change: transform;">
+                        <div ref="cardSetRef" class="flex flex-row flex-nowrap gap-4 items-center">
+                            <div v-if="showStudentCard" class="flex-shrink-0 min-w-[180px] bg-white rounded-2xl shadow-lg p-3 border-2 border-[#800000] flex items-center gap-3 hover:shadow-xl transition-shadow relative">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-[#800000]/10">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#800000]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m9-4a4 4 0 11-8 0 4 4 0 018 0zm6 4v2a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2a2 2 0 012-2h4a2 2 0 012 2z" /></svg>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold mb-1 tracking-wide text-[#800000]">All Students</div>
+                                    <div class="text-2xl font-extrabold text-[#800000]">{{ studentCount }}</div>
+                                </div>
+                            </div>
+                            <div v-if="showStaffCard" class="flex-shrink-0 min-w-[180px] bg-white rounded-2xl shadow-lg p-3 border-2 border-[#FFD700] flex items-center gap-3 hover:shadow-xl transition-shadow relative">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-[#FFD700]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FFD700]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m9-4a4 4 0 11-8 0 4 4 0 018 0zm6 4v2a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2a2 2 0 012-2h4a2 2 0 012 2z" /></svg>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold mb-1 tracking-wide text-[#B8860B]">All Staff</div>
+                                    <div class="text-2xl font-extrabold text-[#B8860B]">{{ staffCount }}</div>
+                                </div>
+                            </div>
+                            <div v-if="showFacultyCard" class="flex-shrink-0 min-w-[180px] bg-white rounded-2xl shadow-lg p-3 border-2 border-[#800000] flex items-center gap-3 hover:shadow-xl transition-shadow relative">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-[#800000]/10">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#800000]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2m-8 0h12a2 2 0 012 2v2H3V8a2 2 0 012-2zm16 4v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6m16 0H3" /></svg>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold mb-1 tracking-wide text-[#800000]">Faculty</div>
+                                    <div class="text-2xl font-extrabold text-[#800000]">{{ facultyCount }}</div>
+                                </div>
+                            </div>
+                            <div v-if="showGradSchoolCard" class="flex-shrink-0 min-w-[180px] bg-white rounded-2xl shadow-lg p-3 border-2 border-[#FFD700] flex items-center gap-3 hover:shadow-xl transition-shadow relative">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-[#FFD700]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FFD700]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0 0H6m6 0h6" /></svg>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold mb-1 tracking-wide text-[#B8860B] whitespace-nowrap" style="font-size: 11px; line-height: 1;">Grad School</div>
+                                    <div class="text-2xl font-extrabold text-[#B8860B]">{{ graduateSchoolCount }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-row flex-nowrap gap-4 items-center">
+                            <div v-if="showStudentCard" class="flex-shrink-0 min-w-[180px] bg-white rounded-2xl shadow-lg p-3 border-2 border-[#800000] flex items-center gap-3 hover:shadow-xl transition-shadow relative">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-[#800000]/10">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#800000]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m9-4a4 4 0 11-8 0 4 4 0 018 0zm6 4v2a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2a2 2 0 012-2h4a2 2 0 012 2z" /></svg>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold mb-1 tracking-wide text-[#800000]">All Students</div>
+                                    <div class="text-2xl font-extrabold text-[#800000]">{{ studentCount }}</div>
+                                </div>
+                            </div>
+                            <div v-if="showStaffCard" class="flex-shrink-0 min-w-[180px] bg-white rounded-2xl shadow-lg p-3 border-2 border-[#FFD700] flex items-center gap-3 hover:shadow-xl transition-shadow relative">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-[#FFD700]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FFD700]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m9-4a4 4 0 11-8 0 4 4 0 018 0zm6 4v2a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2a2 2 0 012-2h4a2 2 0 012 2z" /></svg>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold mb-1 tracking-wide text-[#B8860B]">All Staff</div>
+                                    <div class="text-2xl font-extrabold text-[#B8860B]">{{ staffCount }}</div>
+                                </div>
+                            </div>
+                            <div v-if="showFacultyCard" class="flex-shrink-0 min-w-[180px] bg-white rounded-2xl shadow-lg p-3 border-2 border-[#800000] flex items-center gap-3 hover:shadow-xl transition-shadow relative">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-[#800000]/10">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#800000]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2m-8 0h12a2 2 0 012 2v2H3V8a2 2 0 012-2zm16 4v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6m16 0H3" /></svg>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold mb-1 tracking-wide text-[#800000]">Faculty</div>
+                                    <div class="text-2xl font-extrabold text-[#800000]">{{ facultyCount }}</div>
+                                </div>
+                            </div>
+                            <div v-if="showGradSchoolCard" class="flex-shrink-0 min-w-[180px] bg-white rounded-2xl shadow-lg p-3 border-2 border-[#FFD700] flex items-center gap-3 hover:shadow-xl transition-shadow relative">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-[#FFD700]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FFD700]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0 0H6m6 0h6" /></svg>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold mb-1 tracking-wide text-[#B8860B] whitespace-nowrap" style="font-size: 11px; line-height: 1;">Grad School</div>
+                                    <div class="text-2xl font-extrabold text-[#B8860B]">{{ graduateSchoolCount }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="flex items-center justify-between gap-2 py-4">
@@ -772,3 +921,27 @@ watch(() => window.location.search, () => {
         </Layout>
     </AppLayout>
 </template>
+
+<style scoped>
+.loop-cards {
+    animation: cards-loop 20s linear infinite;
+}
+
+@keyframes cards-loop {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(calc(-1 * var(--cards-loop-distance, 800px)));
+    }
+}
+
+.animate-cards-loop {
+    animation: cards-loop 20s linear infinite;
+}
+
+/* Pause animation on hover */
+.loop-cards:hover {
+    animation-play-state: paused;
+}
+</style>
