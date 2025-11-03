@@ -2,22 +2,22 @@ import { ref, onMounted } from 'vue'
 import { route } from 'ziggy-js'
 
 interface UserStatistics {
-    students: number
-    staff: number
-    faculty: number
-    graduate_school: number
-    admins: number
-    total: number
+    total_patrons: number;
+    undergraduate_students: number;
+    graduate_students: number;
+    all_faculty: number;
+    all_staff: number;
+    all_library_staff: number;
 }
 
 export function useUserStatistics() {
     const statistics = ref<UserStatistics>({
-        students: 0,
-        staff: 0,
-        faculty: 0,
-        graduate_school: 0,
-        admins: 0,
-        total: 0
+        total_patrons: 0,
+        undergraduate_students: 0,
+        graduate_students: 0,
+        all_faculty: 0,
+        all_staff: 0,
+        all_library_staff: 0,
     })
 
     const loading = ref(false)
@@ -28,7 +28,7 @@ export function useUserStatistics() {
         error.value = null
 
         try {
-            const response = await fetch(route('users.statistics'))
+            const response = await fetch(route('users.api.statistics'))
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`)

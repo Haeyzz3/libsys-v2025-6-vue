@@ -88,6 +88,25 @@ class UserController extends Controller
         return $query->paginate($perPage);
     }
 
+    public function getUserStatistics()
+    {
+        $totalPatrons = User::count();
+        $undergraduateStudents = User::whereHas('userType', fn($q) => $q->where('key', 'undergraduate_student'))->count();
+        $graduateStudents = User::whereHas('userType', fn($q) => $q->where('key', 'graduate_student'))->count();
+        $allFaculty = User::whereHas('userType', fn($q) => $q->where('key', 'faculty'))->count();
+        $allStaff = User::whereHas('userType', fn($q) => $q->where('key', 'staff'))->count();
+        $allLibraryStaff = User::whereHas('userType', fn($q) => $q->where('key', 'library_staff'))->count();
+
+        return response()->json([
+            'total_patrons' => $totalPatrons,
+            'undergraduate_students' => $undergraduateStudents,
+            'graduate_students' => $graduateStudents,
+            'all_faculty' => $allFaculty,
+            'all_staff' => $allStaff,
+            'all_library_staff' => $allLibraryStaff,
+        ]);
+    }
+
     public function import()
     {
         return Inertia::render('users/Import');
