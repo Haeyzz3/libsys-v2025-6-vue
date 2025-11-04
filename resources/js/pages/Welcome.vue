@@ -361,9 +361,9 @@ watch(() => window.location.search, () => {
 
 
         <div class="px-4">
-            <div class="relative flex h-[360px] min-w-full items-center justify-center overflow-hidden rounded-2xl">
+            <div class="relative flex h-[360px] min-w-full items-center justify-center overflow-visible rounded-2xl">
                 <!-- Background image layer -->
-                <div class="absolute inset-0 z-0">
+                <div class="absolute inset-0 z-0 overflow-hidden rounded-2xl">
                     <img
                         src="/storage/system_images/eagle.jpg"
                         alt="Library banner"
@@ -373,7 +373,7 @@ watch(() => window.location.search, () => {
                 </div>
 
                 <!-- Gradient overlay -->
-                <div class="absolute inset-0 z-10 bg-gradient-to-b from-black/40 via-black/20 to-black/30"></div>
+                <div class="absolute inset-0 z-10 bg-gradient-to-b from-black/40 via-black/20 to-black/30 rounded-2xl overflow-hidden"></div>
 
                 <!-- Heading -->
                 <div class="absolute top-10 left-1/2 z-20 -translate-x-1/2 text-center drop-shadow">
