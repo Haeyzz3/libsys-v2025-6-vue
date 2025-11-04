@@ -21,9 +21,8 @@ const props = defineProps<{
 }>();
 
 const getCoverUrl = (record: typeof props.record) => {
-    const coverImage = record.book?.cover_image || record.digital_resource?.cover_image || record.periodical?.cover_image;
-    if (coverImage) {
-        return `/storage/uploads/resource-covers/${coverImage}`;
+    if (record.book && record.book.cover_image) {
+        return `/storage/uploads/resource-covers/${record.book.cover_image}`;
     }
     return '/storage/placeholders/sample3.svg';
 };
