@@ -135,5 +135,7 @@ Route::middleware($middleware)->group(function () {
 
 });
 
+Route::get('/records/covers/{filename}', [RecordController::class, 'getCoverImage'])->name('records.cover');
+
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

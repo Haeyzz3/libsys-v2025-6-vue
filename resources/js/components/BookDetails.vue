@@ -6,7 +6,7 @@ defineProps({
 });
 
 const getCoverUrl = (path: string) => {
-    return path ? `/storage/uploads/resource-covers/${path}` : '/storage/placeholders/sample3.svg';
+    return path ? `/records/covers/${path}` : '/storage/placeholders/sample3.svg';
 };
 </script>
 

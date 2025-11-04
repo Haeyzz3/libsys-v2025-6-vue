@@ -22,7 +22,7 @@ const props = defineProps<{
 
 const getCoverUrl = (record: typeof props.record) => {
     if (record.book && record.book.cover_image) {
-        return `/storage/uploads/resource-covers/${record.book.cover_image}`;
+        return `/records/covers/${record.book.cover_image}`;
     }
     return '/storage/placeholders/sample3.svg';
 };

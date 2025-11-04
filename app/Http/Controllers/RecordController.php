@@ -10,7 +10,9 @@ use App\Models\UserType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RecordController extends Controller
 {
@@ -91,8 +93,11 @@ class RecordController extends Controller
         // Validate per_page to ensure it's within acceptable bounds
         $perPage = in_array($request->get('per_page', 6), [3, 6, 9, 12]) ? $request->get('per_page') : 6;
 
+        $validRelations = ['book', 'digitalResource', 'periodical', 'thesis'];
+
         $query = Record::query()
-            ->whereNull('deleted_at');
+            ->whereNull('deleted_at')
+            ->with($validRelations);
 
         // Handle filter parameter
         $filter = $request->get('filter', 'all');
@@ -174,6 +179,17 @@ class RecordController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function getCoverImage(string $filename): StreamedResponse
+    {
+        $path = 'uploads/resource-covers/' . $filename;
+
+        if (!Storage::disk('public')->exists($path)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response($path);
     }
 
 }
