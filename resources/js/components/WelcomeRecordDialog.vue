@@ -87,7 +87,17 @@ const recordTypeComponent = () => {
         </DialogTrigger>
 
         <DialogContent class="max-w-4xl h-[90vh] overflow-hidden">
-            <component :is="recordTypeComponent()" :record="props.record" />
+            <component
+                v-if="recordTypeComponent()"
+                :is="recordTypeComponent()"
+                :record="props.record"
+            />
+            <div v-else class="p-6 text-center">
+                <h2 class="text-2xl font-bold mb-4">{{ props.record.title }}</h2>
+                <p class="text-muted-foreground">
+                    This collection item type is not supported for detailed viewing yet.
+                </p>
+            </div>
         </DialogContent>
     </Dialog>
 </template>

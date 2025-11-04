@@ -1,9 +1,25 @@
 <script setup lang="ts">
 import { getStatusStyle } from '../utils/statusColors';
+import { Badge } from '@/components/ui/badge';
 
 defineProps({
     record: Object,
 });
+
+// Helper function to safely handle arrays or JSON strings
+const safeArrayJoin = (data: any, separator = ', ') => {
+    if (!data) return '';
+    if (Array.isArray(data)) return data.join(separator);
+    if (typeof data === 'string') {
+        try {
+            const parsed = JSON.parse(data);
+            return Array.isArray(parsed) ? parsed.join(separator) : data;
+        } catch {
+            return data;
+        }
+    }
+    return String(data);
+};
 </script>
 
 <template>
@@ -20,7 +36,7 @@ defineProps({
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div class="space-y-1">
                     <span class="font-semibold">Researchers:</span>
-                    <p>{{ record?.thesis.researchers?.join(', ') }}</p>
+                    <p>{{ safeArrayJoin(record?.thesis.researchers) }}</p>
                 </div>
                 <div class="space-y-1">
                     <span class="font-semibold">Adviser:</span>

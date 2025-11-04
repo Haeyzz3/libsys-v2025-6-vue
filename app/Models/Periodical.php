@@ -7,5 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Periodical extends Model
 {
-    use hasFactory;
+    use HasFactory;
+
+    protected $guarded = [];
+
+    protected $casts = [
+        'authors' => 'array', // saved as json in db
+        'editors' => 'array', // saved as json in db
+    ];
 }

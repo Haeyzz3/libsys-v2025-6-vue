@@ -10,4 +10,8 @@ class Thesis extends Model
     use HasFactory;
 
     protected $guarded = [];
+
+    protected $casts = [
+        'researchers' => 'array', // saved as json in db
+    ];
 }
