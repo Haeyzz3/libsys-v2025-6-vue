@@ -11,17 +11,19 @@ const getCoverUrl = (path: string) => {
 </script>
 
 <template>
-    <div class="grid gap-6 h-full max-h-9/10 sm:grid-cols-2 sm:max-w-6xl justify-between">
-        <div class="flex items-center justify-center">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 h-full">
+        <!-- Fixed left column for cover image -->
+        <div class="flex items-start justify-center top-0">
             <img
-                class="max-w-xs rounded-lg shadow-md"
+                class="max-w-xs rounded-lg shadow-md sticky top-6"
                 loading="lazy"
                 :src="getCoverUrl(record?.book.cover_image)"
                 alt="Book Cover"
             />
         </div>
 
-        <div class="space-y-6 overflow-y-auto">
+        <!-- Scrollable right column for details -->
+        <div class="space-y-6 overflow-y-auto h-[80vh] pr-4">
             <div>
                 <h2 class="text-2xl font-bold">{{ record?.title }}</h2>
                 <div class="flex my-4 gap-2">

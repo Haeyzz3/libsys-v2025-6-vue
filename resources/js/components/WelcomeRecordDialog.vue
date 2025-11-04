@@ -86,7 +86,7 @@ const recordTypeComponent = () => {
             </Card>
         </DialogTrigger>
 
-        <DialogContent class="max-w-4xl">
+        <DialogContent class="max-w-4xl h-[90vh] overflow-hidden">
             <component :is="recordTypeComponent()" :record="props.record" />
         </DialogContent>
     </Dialog>
