@@ -13,9 +13,36 @@ import { Input } from "@/components/ui/input"
 import { debounce } from 'lodash-es'
 import WelcomeSearchDialog from '@/components/WelcomeSearchDialog.vue';
 
+// Types for grouped search results
+interface CollectionRecord {
+    id: number;
+    title: string;
+    accession_number: string;
+    status: string;
+    book?: any;
+    digital_resource?: any;
+    periodical?: any;
+    thesis?: any;
+    [key: string]: any;
+}
+
+interface GroupedCollectionRecord {
+    id: number;
+    title: string;
+    accession_number: string;
+    status: string;
+    book?: any;
+    digital_resource?: any;
+    periodical?: any;
+    thesis?: any;
+    copy_count: number;
+    copies: CollectionRecord[];
+}
+
 // Reactive state
 const searchQuery = ref('')
-const searchResults = ref<any[]>([])
+const rawSearchResults = ref<CollectionRecord[]>([])
+const searchResults = ref<GroupedCollectionRecord[]>([])
 const isLoading = ref(false)
 const selectedFilter = ref('all') // Default to "all records"
 
@@ -27,6 +54,44 @@ const filterOptions = [
     { value: 'periodical', label: 'Periodicals/Magazines' },
     { value: 'thesis', label: 'Thesis/Dissertations' }
 ]
+
+// Function to group search results by title (same as Welcome.vue)
+const groupRecordsByTitle = (records: CollectionRecord[]): GroupedCollectionRecord[] => {
+    const titleGroups = new Map<string, CollectionRecord[]>();
+
+    // Group records by title
+    records.forEach(record => {
+        const title = record.title;
+        if (!titleGroups.has(title)) {
+            titleGroups.set(title, []);
+        }
+        titleGroups.get(title)!.push(record);
+    });
+
+    // Convert groups to grouped records
+    const groupedRecords: GroupedCollectionRecord[] = [];
+    titleGroups.forEach((copies, title) => {
+        // Use the first copy as the representative record
+        const representative = copies[0];
+
+        const groupedRecord: GroupedCollectionRecord = {
+            id: representative.id,
+            title: representative.title,
+            accession_number: representative.accession_number,
+            status: representative.status,
+            book: representative.book,
+            digital_resource: representative.digital_resource,
+            periodical: representative.periodical,
+            thesis: representative.thesis,
+            copy_count: copies.length,
+            copies: copies
+        };
+
+        groupedRecords.push(groupedRecord);
+    });
+
+    return groupedRecords;
+};
 
 // Debounced search function
 const debouncedSearch = debounce(async (query: string) => {
@@ -58,13 +123,17 @@ const debouncedSearch = debounce(async (query: string) => {
 
         if (response.ok) {
             const data = await response.json()
-            searchResults.value = data.records || data || []
+            rawSearchResults.value = data.records || data || []
+            // Group search results by title
+            searchResults.value = groupRecordsByTitle(rawSearchResults.value)
         } else {
             console.error('Record search failed:', response.statusText)
+            rawSearchResults.value = []
             searchResults.value = []
         }
     } catch (error) {
         console.error('Record search error:', error)
+        rawSearchResults.value = []
         searchResults.value = []
     } finally {
         isLoading.value = false
@@ -86,6 +155,7 @@ watch(selectedFilter, () => {
 // Clear search - only clear search query and results, preserve filter
 const clearSearch = () => {
     searchQuery.value = ''
+    rawSearchResults.value = []
     searchResults.value = []
     // Remove this line to preserve the filter: selectedFilter.value = 'all'
 }
