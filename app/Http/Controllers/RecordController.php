@@ -91,7 +91,10 @@ class RecordController extends Controller
     public function fetchAllWelcome(Request $request): JsonResponse
     {
         // Validate per_page to ensure it's within acceptable bounds
-        $perPage = in_array($request->get('per_page', 6), [3, 6, 9, 12]) ? $request->get('per_page') : 6;
+        // Allow larger values for frontend grouping, but cap at reasonable limit
+        $requestedPerPage = $request->get('per_page', 6);
+        $allowedSizes = [3, 6, 9, 12, 1000]; // Include 1000 for frontend grouping
+        $perPage = in_array((int)$requestedPerPage, $allowedSizes) ? (int)$requestedPerPage : 6;
 
         $validRelations = ['book', 'digitalResource', 'periodical', 'thesis'];
 

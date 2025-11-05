@@ -9,7 +9,7 @@ import WelcomeRecordDialog from '@/components/WelcomeRecordDialog.vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { ChevronLeftIcon, ChevronRightIcon, DoubleArrowLeftIcon, DoubleArrowRightIcon } from '@radix-icons/vue';
 import { Book, AlertCircle, PlusCircle, Repeat, X } from 'lucide-vue-next';
-import { onMounted, ref, watch, nextTick } from 'vue';
+import { onMounted, ref, watch, nextTick, computed } from 'vue';
 import WelcomeFooter from '@/components/WelcomeFooter.vue';
 import CollectionSearchComboBox from '@/components/CollectionSearchComboBox.vue';
 
@@ -155,7 +155,11 @@ const groupRecordsByTitle = (records: CollectionRecord[]): GroupedCollectionReco
         console.log('Grouping Results:', {
             originalRecords: records.length,
             uniqueTitles: titleGroups.size,
-            groupedRecords: groupedRecords.length
+            groupedRecords: groupedRecords.length,
+            sampleGroups: Array.from(titleGroups.entries()).slice(0, 3).map(([title, copies]) => ({
+                title: title.substring(0, 50),
+                copyCount: copies.length
+            }))
         });
     }
 
@@ -216,6 +220,14 @@ const fetchLatestCollections = async () => {
     }
 };
 
+// Computed properties for better reactivity
+const maxPageIndex = computed(() =>
+    Math.max(0, Math.ceil(totalGroupedTitles.value / pagination.value.pageSize) - 1)
+);
+
+const isFirstPage = computed(() => pagination.value.pageIndex === 0);
+const isLastPage = computed(() => pagination.value.pageIndex >= maxPageIndex.value);
+
 // Apply client-side pagination to grouped collections
 const applyClientPagination = () => {
     // Safety checks
@@ -228,9 +240,8 @@ const applyClientPagination = () => {
     }
 
     // Ensure pageIndex is within bounds
-    const maxPageIndex = Math.max(0, Math.ceil(totalGroupedTitles.value / pagination.value.pageSize) - 1);
-    if (pagination.value.pageIndex > maxPageIndex) {
-        pagination.value.pageIndex = maxPageIndex;
+    if (pagination.value.pageIndex > maxPageIndex.value) {
+        pagination.value.pageIndex = maxPageIndex.value;
     }
 
     const startIndex = pagination.value.pageIndex * pagination.value.pageSize;
@@ -247,10 +258,14 @@ const applyClientPagination = () => {
     // Debug logging (can be removed in production)
     if (import.meta.env.DEV) {
         console.log('Pagination Applied:', {
+            pageIndex: pagination.value.pageIndex,
+            pageSize: pagination.value.pageSize,
             currentPage: currentPage.value,
             totalPages: lastPage.value,
             itemsOnPage: collections.value.length,
-            totalTitles: total.value
+            totalTitles: total.value,
+            startIndex,
+            endIndex
         });
     }
 };
@@ -271,7 +286,7 @@ const handleFilterChange = (value: any) => {
 
 // Pagination navigation functions with scroll preservation
 const goToFirstPage = () => {
-    if (pagination.value.pageIndex > 0 && !isLoadingCollections.value) {
+    if (!isFirstPage.value && !isLoadingCollections.value && allGroupedCollections.value.length > 0) {
         saveScrollPosition();
         pagination.value.pageIndex = 0;
         applyClientPagination();
@@ -282,7 +297,7 @@ const goToFirstPage = () => {
 };
 
 const goToPreviousPage = () => {
-    if (pagination.value.pageIndex > 0 && !isLoadingCollections.value) {
+    if (!isFirstPage.value && !isLoadingCollections.value && allGroupedCollections.value.length > 0) {
         saveScrollPosition();
         pagination.value.pageIndex -= 1;
         applyClientPagination();
@@ -293,7 +308,7 @@ const goToPreviousPage = () => {
 };
 
 const goToNextPage = () => {
-    if (pagination.value.pageIndex < lastPage.value - 1 && !isLoadingCollections.value) {
+    if (!isLastPage.value && !isLoadingCollections.value && allGroupedCollections.value.length > 0) {
         saveScrollPosition();
         pagination.value.pageIndex += 1;
         applyClientPagination();
@@ -304,9 +319,9 @@ const goToNextPage = () => {
 };
 
 const goToLastPage = () => {
-    if (pagination.value.pageIndex < lastPage.value - 1 && !isLoadingCollections.value) {
+    if (!isLastPage.value && !isLoadingCollections.value && allGroupedCollections.value.length > 0) {
         saveScrollPosition();
-        pagination.value.pageIndex = lastPage.value - 1;
+        pagination.value.pageIndex = maxPageIndex.value;
         applyClientPagination();
         nextTick(() => {
             restoreScrollPosition();
@@ -316,13 +331,18 @@ const goToLastPage = () => {
 
 const handlePageSizeChange = (value: any) => {
     if (!isLoadingCollections.value) {
-        saveScrollPosition();
-        pagination.value.pageSize = Number(value);
-        pagination.value.pageIndex = 0; // Reset to first page on page size change
-        applyClientPagination();
-        nextTick(() => {
-            restoreScrollPosition();
-        });
+        const newPageSize = Number(value);
+
+        // Validate page size is in allowed range
+        if (pageSizes.includes(newPageSize)) {
+            saveScrollPosition();
+            pagination.value.pageSize = newPageSize;
+            pagination.value.pageIndex = 0; // Reset to first page on page size change
+            applyClientPagination();
+            nextTick(() => {
+                restoreScrollPosition();
+            });
+        }
     }
 };
 
@@ -386,6 +406,19 @@ onMounted(() => {
 watch(() => window.location.search, () => {
     initializeFromURL();
     fetchLatestCollections();
+});
+
+// Watch pagination state changes to ensure proper updates
+watch(() => pagination.value.pageSize, () => {
+    if (allGroupedCollections.value.length > 0) {
+        applyClientPagination();
+    }
+});
+
+watch(() => pagination.value.pageIndex, () => {
+    if (allGroupedCollections.value.length > 0) {
+        applyClientPagination();
+    }
 });
 </script>
 
@@ -575,7 +608,7 @@ watch(() => window.location.search, () => {
                             <Button
                                 variant="outline"
                                 class="hidden h-8 w-8 p-0 lg:flex"
-                                :disabled="pagination.pageIndex === 0 || isLoadingCollections"
+                                :disabled="isFirstPage || isLoadingCollections || totalGroupedTitles === 0"
                                 @click="goToFirstPage"
                                 aria-label="Go to first page"
                             >
@@ -584,7 +617,7 @@ watch(() => window.location.search, () => {
                             <Button
                                 variant="outline"
                                 class="h-8 w-8 p-0"
-                                :disabled="pagination.pageIndex === 0 || isLoadingCollections"
+                                :disabled="isFirstPage || isLoadingCollections || totalGroupedTitles === 0"
                                 @click="goToPreviousPage"
                                 aria-label="Go to previous page"
                             >
@@ -593,7 +626,7 @@ watch(() => window.location.search, () => {
                             <Button
                                 variant="outline"
                                 class="h-8 w-8 p-0"
-                                :disabled="pagination.pageIndex >= lastPage - 1 || isLoadingCollections"
+                                :disabled="isLastPage || isLoadingCollections || totalGroupedTitles === 0"
                                 @click="goToNextPage"
                                 aria-label="Go to next page"
                             >
@@ -602,7 +635,7 @@ watch(() => window.location.search, () => {
                             <Button
                                 variant="outline"
                                 class="hidden h-8 w-8 p-0 lg:flex"
-                                :disabled="pagination.pageIndex >= lastPage - 1 || isLoadingCollections"
+                                :disabled="isLastPage || isLoadingCollections || totalGroupedTitles === 0"
                                 @click="goToLastPage"
                                 aria-label="Go to last page"
                             >
