@@ -29,7 +29,6 @@ const safeArrayJoin = (data: any, separator = ', ') => {
                 <h2 class="text-2xl font-bold">{{ record?.title }}</h2>
                 <div class="flex my-4 gap-2">
                     <p class="text-muted-foreground">{{ record?.accession_number }}</p>
-                    <Badge v-if="record?.copy_count > 1">{{ record?.copy_count }} copies</Badge>
                 </div>
             </div>
 

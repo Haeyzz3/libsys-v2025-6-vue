@@ -35,6 +35,20 @@ interface CollectionRecord {
     [key: string]: any;
 }
 
+// Grouped collection record interface
+interface GroupedCollectionRecord {
+    id: number;
+    title: string;
+    accession_number: string;
+    status: string;
+    book?: any;
+    digital_resource?: any;
+    periodical?: any;
+    thesis?: any;
+    copy_count: number;
+    copies: CollectionRecord[];
+}
+
 // API Response type for collections
 interface ApiResponse {
     data: CollectionRecord[];
@@ -52,7 +66,8 @@ declare module '@inertiajs/core' {
 }
 
 // Reactive state for collections data
-const collections = ref<CollectionRecord[]>([]);
+const collections = ref<GroupedCollectionRecord[]>([]);
+const rawCollections = ref<CollectionRecord[]>([]);
 const isLoadingCollections = ref(false);
 const currentPage = ref(1);
 const lastPage = ref(1);
@@ -111,6 +126,44 @@ const getFilterDisplayName = () => {
     return option ? option.label : 'Collections';
 };
 
+// Function to group records by title
+const groupRecordsByTitle = (records: CollectionRecord[]): GroupedCollectionRecord[] => {
+    const titleGroups = new Map<string, CollectionRecord[]>();
+
+    // Group records by title
+    records.forEach(record => {
+        const title = record.title;
+        if (!titleGroups.has(title)) {
+            titleGroups.set(title, []);
+        }
+        titleGroups.get(title)!.push(record);
+    });
+
+    // Convert groups to grouped records
+    const groupedRecords: GroupedCollectionRecord[] = [];
+    titleGroups.forEach((copies, title) => {
+        // Use the first copy as the representative record
+        const representative = copies[0];
+
+        const groupedRecord: GroupedCollectionRecord = {
+            id: representative.id,
+            title: representative.title,
+            accession_number: representative.accession_number,
+            status: representative.status,
+            book: representative.book,
+            digital_resource: representative.digital_resource,
+            periodical: representative.periodical,
+            thesis: representative.thesis,
+            copy_count: copies.length,
+            copies: copies
+        };
+
+        groupedRecords.push(groupedRecord);
+    });
+
+    return groupedRecords;
+};
+
 // Fetch latest collections data
 const fetchLatestCollections = async () => {
     isLoadingCollections.value = true;
@@ -144,8 +197,11 @@ const fetchLatestCollections = async () => {
 
         const result: ApiResponse = await response.json();
 
-        // Update reactive data
-        collections.value = result.data || [];
+        // Store raw collections
+        rawCollections.value = result.data || [];
+
+        // Group records by title and update reactive data
+        collections.value = groupRecordsByTitle(rawCollections.value);
         currentPage.value = result.current_page || 1;
         lastPage.value = result.last_page || 1;
         total.value = result.total || 0;
