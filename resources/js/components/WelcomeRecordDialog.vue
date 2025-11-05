@@ -138,9 +138,9 @@ const recordTypeComponent = () => {
             </Card>
         </DialogTrigger>
 
-        <DialogContent class="max-w-4xl h-[90vh] overflow-hidden">
+        <DialogContent class="max-w-7xl w-[95vw] h-[90vh] overflow-hidden flex flex-col p-0">
             <!-- Copy Navigation Header (only show if multiple copies) -->
-            <div v-if="hasMultipleCopies" class="flex items-center justify-between p-4 border-b border-border">
+            <div v-if="hasMultipleCopies" class="flex items-center justify-between p-4 border-b border-border bg-background/95 backdrop-blur-sm">
                 <div class="flex items-center gap-4">
                     <Badge variant="outline">
                         Copy {{ currentCopyIndex + 1 }} of {{ totalCopies }}
@@ -172,17 +172,19 @@ const recordTypeComponent = () => {
             </div>
 
             <!-- Current Copy Details -->
-            <div class="flex-1 overflow-hidden">
+            <div class="flex-1 overflow-hidden p-6">
                 <component
                     v-if="recordTypeComponent()"
                     :is="recordTypeComponent()"
                     :record="currentCopy"
                 />
-                <div v-else class="p-6 text-center">
-                    <h2 class="text-2xl font-bold mb-4">{{ currentCopy.title }}</h2>
-                    <p class="text-muted-foreground">
-                        This collection item type is not supported for detailed viewing yet.
-                    </p>
+                <div v-else class="flex items-center justify-center h-full text-center">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-4">{{ currentCopy.title }}</h2>
+                        <p class="text-muted-foreground">
+                            This collection item type is not supported for detailed viewing yet.
+                        </p>
+                    </div>
                 </div>
             </div>
         </DialogContent>
