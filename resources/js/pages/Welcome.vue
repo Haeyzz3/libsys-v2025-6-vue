@@ -67,11 +67,13 @@ declare module '@inertiajs/core' {
 
 // Reactive state for collections data
 const collections = ref<GroupedCollectionRecord[]>([]);
+const allGroupedCollections = ref<GroupedCollectionRecord[]>([]);
 const rawCollections = ref<CollectionRecord[]>([]);
 const isLoadingCollections = ref(false);
 const currentPage = ref(1);
 const lastPage = ref(1);
 const total = ref(0);
+const totalGroupedTitles = ref(0);
 const collectionsError = ref<string | null>(null);
 
 // Updated filter state with all resource types
@@ -107,19 +109,6 @@ const restoreScrollPosition = () => {
     });
 };
 
-// Utility function for debouncing
-function debounce(func: Function, wait: number) {
-    let timeout: ReturnType<typeof setTimeout>;
-    return function executedFunction(...args: any[]) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
 // Helper function to get display name for current filter
 const getFilterDisplayName = () => {
     const option = filterOptions.find(opt => opt.value === filterType.value);
@@ -132,7 +121,7 @@ const groupRecordsByTitle = (records: CollectionRecord[]): GroupedCollectionReco
 
     // Group records by title
     records.forEach(record => {
-        const title = record.title;
+        const title = record.title || 'Untitled'; // Handle null/undefined titles
         if (!titleGroups.has(title)) {
             titleGroups.set(title, []);
         }
@@ -141,7 +130,7 @@ const groupRecordsByTitle = (records: CollectionRecord[]): GroupedCollectionReco
 
     // Convert groups to grouped records
     const groupedRecords: GroupedCollectionRecord[] = [];
-    titleGroups.forEach((copies, title) => {
+    titleGroups.forEach((copies) => {
         // Use the first copy as the representative record
         const representative = copies[0];
 
@@ -161,6 +150,15 @@ const groupRecordsByTitle = (records: CollectionRecord[]): GroupedCollectionReco
         groupedRecords.push(groupedRecord);
     });
 
+    // Debug logging (can be removed in production)
+    if (import.meta.env.DEV) {
+        console.log('Grouping Results:', {
+            originalRecords: records.length,
+            uniqueTitles: titleGroups.size,
+            groupedRecords: groupedRecords.length
+        });
+    }
+
     return groupedRecords;
 };
 
@@ -170,10 +168,10 @@ const fetchLatestCollections = async () => {
     collectionsError.value = null;
 
     try {
-        // Build query parameters for collections
+        // Build query parameters for collections - fetch all records to group properly
+        // Note: For production with large datasets, consider implementing server-side grouping
         const params = new URLSearchParams();
-        params.append('page', (pagination.value.pageIndex + 1).toString());
-        params.append('per_page', pagination.value.pageSize.toString());
+        params.append('per_page', '1000'); // Fetch a large number to get all records for grouping
         params.append('sort_field', 'created_at');
         params.append('sort_direction', 'desc');
 
@@ -200,33 +198,70 @@ const fetchLatestCollections = async () => {
         // Store raw collections
         rawCollections.value = result.data || [];
 
-        // Group records by title and update reactive data
-        collections.value = groupRecordsByTitle(rawCollections.value);
-        currentPage.value = result.current_page || 1;
-        lastPage.value = result.last_page || 1;
-        total.value = result.total || 0;
+        // Group records by title
+        allGroupedCollections.value = groupRecordsByTitle(rawCollections.value);
+        totalGroupedTitles.value = allGroupedCollections.value.length;
 
-        // Update pagination state to match API response
-        pagination.value.pageIndex = (result.current_page || 1) - 1;
-        pagination.value.pageSize = result.per_page || 6;
+        // Apply client-side pagination to grouped collections
+        applyClientPagination();
 
     } catch (err) {
         console.error('Collections API fetch error:', err);
         collectionsError.value = err instanceof Error ? err.message : 'An error occurred while fetching collections';
         collections.value = [];
+        allGroupedCollections.value = [];
+        totalGroupedTitles.value = 0;
     } finally {
         isLoadingCollections.value = false;
     }
 };
 
-// Debounced fetch for immediate UI feedback
-const debouncedFetch = debounce(fetchLatestCollections, 300);
+// Apply client-side pagination to grouped collections
+const applyClientPagination = () => {
+    // Safety checks
+    if (!allGroupedCollections.value || allGroupedCollections.value.length === 0) {
+        collections.value = [];
+        currentPage.value = 1;
+        lastPage.value = 1;
+        total.value = 0;
+        return;
+    }
+
+    // Ensure pageIndex is within bounds
+    const maxPageIndex = Math.max(0, Math.ceil(totalGroupedTitles.value / pagination.value.pageSize) - 1);
+    if (pagination.value.pageIndex > maxPageIndex) {
+        pagination.value.pageIndex = maxPageIndex;
+    }
+
+    const startIndex = pagination.value.pageIndex * pagination.value.pageSize;
+    const endIndex = startIndex + pagination.value.pageSize;
+
+    // Get the current page of grouped collections
+    collections.value = allGroupedCollections.value.slice(startIndex, endIndex);
+
+    // Update pagination metadata based on grouped titles
+    currentPage.value = pagination.value.pageIndex + 1;
+    lastPage.value = Math.max(1, Math.ceil(totalGroupedTitles.value / pagination.value.pageSize));
+    total.value = totalGroupedTitles.value;
+
+    // Debug logging (can be removed in production)
+    if (import.meta.env.DEV) {
+        console.log('Pagination Applied:', {
+            currentPage: currentPage.value,
+            totalPages: lastPage.value,
+            itemsOnPage: collections.value.length,
+            totalTitles: total.value
+        });
+    }
+};
+
+
 
 // Handle filter change
-const handleFilterChange = (value: string) => {
+const handleFilterChange = (value: any) => {
     if (!isLoadingCollections.value) {
         saveScrollPosition();
-        filterType.value = value;
+        filterType.value = String(value);
         pagination.value.pageIndex = 0; // Reset to first page on filter change
         fetchLatestCollections().then(() => {
             restoreScrollPosition();
@@ -239,7 +274,8 @@ const goToFirstPage = () => {
     if (pagination.value.pageIndex > 0 && !isLoadingCollections.value) {
         saveScrollPosition();
         pagination.value.pageIndex = 0;
-        fetchLatestCollections().then(() => {
+        applyClientPagination();
+        nextTick(() => {
             restoreScrollPosition();
         });
     }
@@ -249,7 +285,8 @@ const goToPreviousPage = () => {
     if (pagination.value.pageIndex > 0 && !isLoadingCollections.value) {
         saveScrollPosition();
         pagination.value.pageIndex -= 1;
-        fetchLatestCollections().then(() => {
+        applyClientPagination();
+        nextTick(() => {
             restoreScrollPosition();
         });
     }
@@ -259,7 +296,8 @@ const goToNextPage = () => {
     if (pagination.value.pageIndex < lastPage.value - 1 && !isLoadingCollections.value) {
         saveScrollPosition();
         pagination.value.pageIndex += 1;
-        fetchLatestCollections().then(() => {
+        applyClientPagination();
+        nextTick(() => {
             restoreScrollPosition();
         });
     }
@@ -269,18 +307,20 @@ const goToLastPage = () => {
     if (pagination.value.pageIndex < lastPage.value - 1 && !isLoadingCollections.value) {
         saveScrollPosition();
         pagination.value.pageIndex = lastPage.value - 1;
-        fetchLatestCollections().then(() => {
+        applyClientPagination();
+        nextTick(() => {
             restoreScrollPosition();
         });
     }
 };
 
-const handlePageSizeChange = (value: string) => {
+const handlePageSizeChange = (value: any) => {
     if (!isLoadingCollections.value) {
         saveScrollPosition();
         pagination.value.pageSize = Number(value);
         pagination.value.pageIndex = 0; // Reset to first page on page size change
-        fetchLatestCollections().then(() => {
+        applyClientPagination();
+        nextTick(() => {
             restoreScrollPosition();
         });
     }
@@ -312,7 +352,7 @@ const stats = [
     {
         title: 'New Arrivals',
         value: '+' + (page.props.newThisMonth?.toLocaleString() || '0'),
-        change: `${page.props.percentChangeThisMonth > 0 ? '+' : ''}${page.props.percentChangeThisMonth}% from last month`,
+        change: `${(page.props.percentChangeThisMonth as number) > 0 ? '+' : ''}${(page.props.percentChangeThisMonth as number)}% from last month`,
         icon: PlusCircle,
     },
     {
@@ -322,11 +362,7 @@ const stats = [
         icon: Repeat,
     },
 ];
-//branding
-const branding = {
-    logoUrl: '/images/projectStatic/eagle.jpg', // or dynamic source
-    headerLinkText: 'ULRC Tagum-Mabini'
-};
+
 
 const heroVisible = ref(false);
 
@@ -507,7 +543,7 @@ watch(() => window.location.search, () => {
                 <!-- Pagination Controls -->
                 <div class="flex items-center justify-end space-x-4 pt-8">
                     <div class="flex-1 text-sm text-muted-foreground">
-                        Showing page {{ currentPage }} of {{ lastPage }} in {{ total }} {{ total === 1 || total === 0 ? 'item' : 'items' }}.
+                        Showing page {{ currentPage }} of {{ lastPage }} ({{ total }} {{ total === 1 || total === 0 ? 'title' : 'titles' }}).
                     </div>
 
                     <!-- Combine select + buttons in one flex group -->
