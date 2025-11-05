@@ -56,7 +56,8 @@ class WelcomeController extends Controller
 
         $searchQuery = $request->get('q');
         $typeFilter = $request->get('type');
-        $limit = $request->get('limit', 5); // Limit results to prevent overwhelming UI
+        // Remove the artificial limit - let frontend handle grouping first, then limit if needed
+        // The limit was preventing proper grouping when there are more than 5 copies of the same title
 
         try {
             $query = Record::query()
@@ -87,7 +88,7 @@ class WelcomeController extends Controller
             $records = $query
                 ->with(['book', 'digitalResource', 'periodical', 'thesis']) // Eager load relations
                 ->orderBy('title', 'asc')
-                ->limit($limit)
+                ->limit(200) // Higher limit to allow proper grouping while preventing performance issues
                 ->get();
 
             return response()->json([

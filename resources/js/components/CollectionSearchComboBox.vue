@@ -61,7 +61,7 @@ const groupRecordsByTitle = (records: CollectionRecord[]): GroupedCollectionReco
 
     // Group records by title
     records.forEach(record => {
-        const title = record.title;
+        const title = record.title || 'Untitled';
         if (!titleGroups.has(title)) {
             titleGroups.set(title, []);
         }
@@ -70,7 +70,7 @@ const groupRecordsByTitle = (records: CollectionRecord[]): GroupedCollectionReco
 
     // Convert groups to grouped records
     const groupedRecords: GroupedCollectionRecord[] = [];
-    titleGroups.forEach((copies, title) => {
+    titleGroups.forEach((copies) => {
         // Use the first copy as the representative record
         const representative = copies[0];
 
@@ -89,6 +89,16 @@ const groupRecordsByTitle = (records: CollectionRecord[]): GroupedCollectionReco
 
         groupedRecords.push(groupedRecord);
     });
+
+    // Debug logging for search results grouping
+    if (import.meta.env.DEV) {
+        console.log('Search Results Grouping:', {
+            originalRecords: records.length,
+            uniqueTitles: titleGroups.size,
+            groupedRecords: groupedRecords.length,
+            copyCounts: groupedRecords.map(g => ({ title: g.title.substring(0, 50), copies: g.copy_count }))
+        });
+    }
 
     return groupedRecords;
 };
@@ -125,7 +135,9 @@ const debouncedSearch = debounce(async (query: string) => {
             const data = await response.json()
             rawSearchResults.value = data.records || data || []
             // Group search results by title
-            searchResults.value = groupRecordsByTitle(rawSearchResults.value)
+            const groupedResults = groupRecordsByTitle(rawSearchResults.value)
+            // Limit to 10 grouped results to prevent UI overwhelming, but each group contains all copies
+            searchResults.value = groupedResults.slice(0, 10)
         } else {
             console.error('Record search failed:', response.statusText)
             rawSearchResults.value = []
